@@ -1,0 +1,6 @@
+# winget version manifest template. Replace VERSION with the release version (without the v).
+PackageIdentifier: Zacess.Scenes
+PackageVersion: VERSION
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

@@ -1,0 +1,104 @@
+# builds a binary for each platform when a version tag is pushed and attaches it to the GitHub
+# release for that tag. The release itself is made by a maintainer from a signed tag, so this
+# workflow waits for it rather than creating one.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+    permissions:
+      # only to attach the built files to the release of this tag
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: Set up the musl cross toolchain
+        if: contains(matrix.target, 'musl')
+        uses: taiki-e/setup-cross-toolchain-action@12b7ad4acfa95a1476779d6c06699b96ec1691f8 # v1.42.0
+        with:
+          target: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }}
+      - name: Package the binary with the docs
+        id: package
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          name="zacess-scenes-$TAG-$TARGET"
+          mkdir "$name"
+          cp README.md LICENSE CHANGELOG.md ACCESSIBILITY.md "$name/"
+          if [[ "$TARGET" == *windows* ]]; then
+            cp "target/$TARGET/release/zacess-scenes.exe" "$name/"
+            7z a -tzip "$name.zip" "$name" > /dev/null
+            asset="$name.zip"
+          else
+            cp "target/$TARGET/release/zacess-scenes" "$name/"
+            tar -czf "$name.tar.gz" "$name"
+            asset="$name.tar.gz"
+          fi
+          if command -v sha256sum > /dev/null; then
+            sha256sum "$asset" > "$asset.sha256"
+          else
+            shasum -a 256 "$asset" > "$asset.sha256"
+          fi
+          cat "$asset.sha256"
+          echo "asset=$asset" >> "$GITHUB_OUTPUT"
+      - name: Wait for the release of this tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          # the maintainer makes the release right after pushing the tag, so this is usually quick
+          for attempt in $(seq 1 40); do
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+              exit 0
+            fi
+            echo "No release for $TAG yet (attempt $attempt of 40). Waiting 30 seconds."
+            sleep 30
+          done
+          echo "No release named $TAG exists after 20 minutes. Create it from the tag, then rerun this workflow."
+          exit 1
+      - name: Attach the files to the release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          ASSET: ${{ steps.package.outputs.asset }}
+        run: gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --repo "$GITHUB_REPOSITORY" --clobber

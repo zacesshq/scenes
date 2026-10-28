@@ -1,0 +1,29 @@
+[package]
+name = "zacess-scenes"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Calm animated scenes for the terminal in the Zacess high contrast themes"
+license = "MIT"
+repository = "https://github.com/zacesshq/scenes"
+homepage = "https://zacess.com"
+readme = "README.md"
+keywords = ["terminal", "animation", "accessibility", "screensaver", "high-contrast"]
+categories = ["command-line-utilities", "accessibility"]
+exclude = [".github/", "packaging/", "scripts/", "palette/"]
+
+[lib]
+name = "zacess_scenes"
+path = "src/lib.rs"
+
+[[bin]]
+name = "zacess-scenes"
+path = "src/main.rs"
+
+[dependencies]
+crossterm = "0.29"
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true

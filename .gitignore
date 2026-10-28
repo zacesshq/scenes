@@ -1,0 +1,6 @@
+# rust
+target/
+# os and editors
+.DS_Store
+.idea/
+.vscode/

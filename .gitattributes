@@ -1,0 +1,11 @@
+# Enforce LF line endings so Windows and Unix contributors never fight over CRLF.
+* text=auto eol=lf
+
+# Binary files, never converted
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.ico   binary
+
+# lockfiles are written by tools, so their diffs are collapsed in reviews
+Cargo.lock  linguist-generated
