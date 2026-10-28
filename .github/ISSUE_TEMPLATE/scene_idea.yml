@@ -1,0 +1,43 @@
+name: Scene idea
+description: A new scene or something an existing scene should draw.
+labels: ["enhancement"]
+body:
+  - type: input
+    id: name
+    attributes:
+      label: The scene
+      description: A short name for a new scene. For an addition, the existing scene it belongs to.
+      placeholder: lighthouse
+    validations:
+      required: true
+  - type: textarea
+    id: picture
+    attributes:
+      label: What it shows
+      description: What is on screen and what moves. Characters you have in mind are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: calm
+    attributes:
+      label: Under reduced motion
+      description: What stays still, slows down or is left out when motion is reduced. Nothing may flash and nothing that changes in place may change more than three times a second.
+    validations:
+      required: true
+  - type: textarea
+    id: small
+    attributes:
+      label: On a small terminal
+      description: What it looks like at 20 columns by 8 rows, where there is no room for everything.
+  - type: textarea
+    id: colours
+    attributes:
+      label: Colours
+      description: Which of the theme's colours each part would use, if you have a view. Every colour has to keep 4.5 to 1 contrast on the background in all eight themes.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I checked existing issues for the same idea.
+          required: true

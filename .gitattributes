@@ -1,0 +1,11 @@
+# lf everywhere, so Windows and Unix checkouts never differ in line endings
+* text=auto eol=lf
+
+# images would be corrupted by line ending conversion
+*.png   binary
+*.jpg   binary
+*.gif   binary
+*.ico   binary
+
+# lockfiles are written by tools, so their diffs are collapsed in reviews
+Cargo.lock  linguist-generated
