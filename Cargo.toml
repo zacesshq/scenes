@@ -25,7 +25,7 @@ crossterm = "0.29"
 
 [target.'cfg(unix)'.dependencies]
 # already a dependency of crossterm on Unix; used directly to restore the terminal on SIGTERM
-signal-hook = "0.3"
+signal-hook = "0.4"
 
 [profile.release]
 lto = true
