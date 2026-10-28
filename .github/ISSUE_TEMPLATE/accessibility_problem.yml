@@ -1,0 +1,67 @@
+name: Accessibility problem
+description: Something in a scene is hard to see, moves too much, flashes or gets in the way of using the terminal.
+labels: ["accessibility"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for telling us. We treat an accessibility problem as a bug. You never need to share a diagnosis or anything personal: describe what happened and we will work from that. If you would rather report privately, email contact@zacess.com.
+  - type: dropdown
+    id: scene
+    attributes:
+      label: Scene
+      multiple: true
+      options:
+        - sea
+        - rain
+        - snow
+        - starfield
+        - code-rain
+        - fireflies
+        - aurora
+        - campfire
+        - waves
+        - zacess
+        - Every scene
+        - The help line or the keys
+    validations:
+      required: true
+  - type: dropdown
+    id: theme
+    attributes:
+      label: Theme
+      multiple: true
+      options:
+        - Zacess Light
+        - Zacess Dark
+        - Zacess Yellow on Black
+        - Zacess Cream
+        - Zacess High Contrast Dark
+        - Zacess High Contrast Light
+        - Zacess Deep Contrast Dark
+        - Zacess Deep Contrast Light
+        - NO_COLOR
+  - type: textarea
+    id: barrier
+    attributes:
+      label: What got in the way
+      description: What was hard to see, moved too much or flashed. If the program did something to your terminal, say what. Tell us what would have worked for you if you know.
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings you were using (optional)
+      description: Whether reduced motion was on (the flag, the variable or the system setting), the frame rate, `--slow` and anything that changes how colours look, such as a colour filter or inverted colours.
+      placeholder: ZACESS_REDUCED_MOTION=1, macOS Reduce Motion on, 150% zoom
+  - type: input
+    id: assistive-tech
+    attributes:
+      label: Assistive technology used (optional)
+      description: Screen reader, magnifier, switch access, voice control or settings such as high contrast or larger text, with versions if you know them.
+      placeholder: VoiceOver on macOS 26 in Terminal.app
+  - type: input
+    id: version
+    attributes:
+      label: Version and terminal (optional)
+      placeholder: zacess-scenes 0.1.0, Windows Terminal 1.23

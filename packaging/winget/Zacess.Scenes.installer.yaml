@@ -1,0 +1,15 @@
+# winget installer manifest template. Replace VERSION with the release version (without the v)
+# and SHA256_WINDOWS with the sum from the zip's .sha256 file on the release.
+PackageIdentifier: Zacess.Scenes
+PackageVersion: VERSION
+InstallerType: zip
+NestedInstallerType: portable
+NestedInstallerFiles:
+  - RelativeFilePath: zacess-scenes-vVERSION-x86_64-pc-windows-msvc\zacess-scenes.exe
+    PortableCommandAlias: zacess-scenes
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/zacesshq/scenes/releases/download/vVERSION/zacess-scenes-vVERSION-x86_64-pc-windows-msvc.zip
+    InstallerSha256: SHA256_WINDOWS
+ManifestType: installer
+ManifestVersion: 1.6.0

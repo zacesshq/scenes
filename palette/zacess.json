@@ -1,0 +1,1024 @@
+{
+  "$schema": "./schema.json",
+  "name": "Zacess",
+  "version": "0.5.0",
+  "rules": {
+    "textContrast": 7,
+    "findMatchContrast": 4.5,
+    "selectionContrast": 4.5,
+    "nonTextContrast": 3,
+    "ansiFloor": 4.5,
+    "toneStep": 0.05,
+    "deficiencyDistance": 0.04,
+    "selectionDistance": 0.08
+  },
+  "tokens": {
+    "keyword": {
+      "style": [
+        "bold"
+      ],
+      "description": "Declarations and other keywords such as const, class and fn"
+    },
+    "control": {
+      "style": [
+        "bold"
+      ],
+      "description": "Control flow such as if, return, for and import"
+    },
+    "function": {
+      "style": [],
+      "description": "Function and method names"
+    },
+    "type": {
+      "style": [],
+      "description": "Types, classes, interfaces and enums"
+    },
+    "variable": {
+      "style": [],
+      "description": "Variables and identifiers"
+    },
+    "parameter": {
+      "style": [
+        "italic"
+      ],
+      "description": "Function parameters"
+    },
+    "property": {
+      "style": [],
+      "description": "Object properties, fields and keys"
+    },
+    "string": {
+      "style": [],
+      "description": "Strings and characters"
+    },
+    "number": {
+      "style": [],
+      "description": "Numbers, booleans and other constants"
+    },
+    "comment": {
+      "style": [
+        "italic"
+      ],
+      "description": "Comments, never dimmed below the contrast floor"
+    },
+    "operator": {
+      "style": [],
+      "description": "Operators and punctuation"
+    },
+    "tag": {
+      "style": [
+        "bold"
+      ],
+      "description": "Markup tags"
+    },
+    "attribute": {
+      "style": [],
+      "description": "Markup attributes"
+    },
+    "regex": {
+      "style": [],
+      "description": "Regular expressions"
+    },
+    "invalid": {
+      "style": [
+        "underline"
+      ],
+      "description": "Invalid code and illegal characters"
+    },
+    "added": {
+      "style": [],
+      "description": "Added lines in a diff"
+    },
+    "removed": {
+      "style": [],
+      "description": "Removed lines in a diff"
+    },
+    "changed": {
+      "style": [],
+      "description": "Changed lines in a diff"
+    }
+  },
+  "pairs": [
+    {
+      "pair": [
+        "keyword",
+        "function"
+      ]
+    },
+    {
+      "pair": [
+        "keyword",
+        "type"
+      ]
+    },
+    {
+      "pair": [
+        "keyword",
+        "variable"
+      ]
+    },
+    {
+      "pair": [
+        "control",
+        "keyword"
+      ]
+    },
+    {
+      "pair": [
+        "control",
+        "variable"
+      ]
+    },
+    {
+      "pair": [
+        "control",
+        "function"
+      ]
+    },
+    {
+      "pair": [
+        "function",
+        "variable"
+      ]
+    },
+    {
+      "pair": [
+        "function",
+        "type"
+      ]
+    },
+    {
+      "pair": [
+        "function",
+        "property"
+      ]
+    },
+    {
+      "pair": [
+        "function",
+        "string"
+      ]
+    },
+    {
+      "pair": [
+        "type",
+        "variable"
+      ]
+    },
+    {
+      "pair": [
+        "type",
+        "property"
+      ]
+    },
+    {
+      "pair": [
+        "variable",
+        "property"
+      ]
+    },
+    {
+      "pair": [
+        "variable",
+        "parameter"
+      ]
+    },
+    {
+      "pair": [
+        "parameter",
+        "type"
+      ]
+    },
+    {
+      "pair": [
+        "parameter",
+        "property"
+      ]
+    },
+    {
+      "pair": [
+        "property",
+        "string"
+      ]
+    },
+    {
+      "pair": [
+        "string",
+        "comment"
+      ]
+    },
+    {
+      "pair": [
+        "number",
+        "variable"
+      ]
+    },
+    {
+      "pair": [
+        "number",
+        "operator"
+      ]
+    },
+    {
+      "pair": [
+        "comment",
+        "variable"
+      ]
+    },
+    {
+      "pair": [
+        "tag",
+        "attribute"
+      ]
+    },
+    {
+      "pair": [
+        "attribute",
+        "string"
+      ]
+    },
+    {
+      "pair": [
+        "invalid",
+        "variable"
+      ]
+    },
+    {
+      "pair": [
+        "string",
+        "number"
+      ],
+      "lightness": true
+    },
+    {
+      "pair": [
+        "string",
+        "regex"
+      ],
+      "lightness": true
+    },
+    {
+      "pair": [
+        "string",
+        "invalid"
+      ],
+      "lightness": true
+    },
+    {
+      "pair": [
+        "added",
+        "removed"
+      ],
+      "lightness": true
+    },
+    {
+      "pair": [
+        "added",
+        "changed"
+      ],
+      "lightness": true
+    },
+    {
+      "pair": [
+        "removed",
+        "changed"
+      ],
+      "lightness": true
+    }
+  ],
+  "themes": [
+    {
+      "id": "light",
+      "name": "Zacess Light",
+      "appearance": "light",
+      "vscodeUiTheme": "vs",
+      "readerProfile": "dark_on_light",
+      "description": "Ink on white, the reader's Dark on light theme.",
+      "ui": {
+        "background": "#ffffff",
+        "foreground": "#111111",
+        "surface": "#f4f4f4",
+        "surfaceAlt": "#ededed",
+        "muted": "#424242",
+        "border": "#707070",
+        "borderActive": "#0049a3",
+        "accent": "#0049a3",
+        "accentForeground": "#ffffff",
+        "link": "#0049a3",
+        "selection": "#9bc3ff",
+        "selectionStrong": "#0150b2",
+        "selectionForeground": "#ffffff",
+        "listSelection": "#fff1a8",
+        "lineHighlight": "#f0f0f0",
+        "cursor": "#111111",
+        "gutter": "#ffffff",
+        "lineNumber": "#4d4d4d",
+        "lineNumberActive": "#111111",
+        "findMatch": "#ffd400",
+        "findMatchBorder": "#111111",
+        "error": "#810005",
+        "warning": "#583600",
+        "info": "#003a84",
+        "diffAddedBackground": "#e3f5e6",
+        "diffRemovedBackground": "#fdeaea",
+        "indentGuide": "#8a8a8a",
+        "whitespace": "#767676"
+      },
+      "syntax": {
+        "foreground": "#111111",
+        "keyword": "#59029f",
+        "control": "#5e003c",
+        "function": "#0049a3",
+        "type": "#003737",
+        "variable": "#111111",
+        "parameter": "#4c2300",
+        "property": "#030075",
+        "string": "#004a0e",
+        "number": "#4c1b00",
+        "comment": "#97016b",
+        "operator": "#111111",
+        "tag": "#59029f",
+        "attribute": "#412300",
+        "regex": "#5b0020",
+        "invalid": "#5d0002",
+        "added": "#005b14",
+        "removed": "#5d0002",
+        "changed": "#001940"
+      },
+      "terminal": {
+        "ansi": [
+          "#111111",
+          "#ca010e",
+          "#01751c",
+          "#885a00",
+          "#005fcc",
+          "#b301ae",
+          "#026f6f",
+          "#484848",
+          "#4d4d4d",
+          "#e90112",
+          "#008722",
+          "#9d6902",
+          "#006eed",
+          "#cf01c7",
+          "#028181",
+          "#111111"
+        ],
+        "dim": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "backgroundRole": [],
+        "textRole": [
+          0,
+          15
+        ]
+      }
+    },
+    {
+      "id": "dark",
+      "name": "Zacess Dark",
+      "appearance": "dark",
+      "vscodeUiTheme": "vs-dark",
+      "readerProfile": "light_on_dark",
+      "description": "Near white on near black, the reader's Light on dark theme.",
+      "ui": {
+        "background": "#121212",
+        "foreground": "#f5f5f5",
+        "surface": "#1a1a1a",
+        "surfaceAlt": "#232323",
+        "muted": "#c8c8c8",
+        "border": "#7a7a7a",
+        "borderActive": "#8cbcff",
+        "accent": "#8cbcff",
+        "accentForeground": "#121212",
+        "link": "#8cbcff",
+        "selection": "#004769",
+        "selectionStrong": "#4fbdff",
+        "selectionForeground": "#121212",
+        "listSelection": "#1a2436",
+        "lineHighlight": "#1f1f1f",
+        "cursor": "#ffd400",
+        "gutter": "#121212",
+        "lineNumber": "#b8b8b8",
+        "lineNumberActive": "#f5f5f5",
+        "findMatch": "#332a00",
+        "findMatchBorder": "#ffd400",
+        "error": "#ffccc4",
+        "warning": "#ffd182",
+        "info": "#bddaff",
+        "diffAddedBackground": "#0f2a17",
+        "diffRemovedBackground": "#331414",
+        "indentGuide": "#6b6b6b",
+        "whitespace": "#7a7a7a"
+      },
+      "syntax": {
+        "foreground": "#f5f5f5",
+        "keyword": "#d3bdff",
+        "control": "#ffd2e6",
+        "function": "#84b7fa",
+        "type": "#03dedd",
+        "variable": "#f5f5f5",
+        "parameter": "#ffb97f",
+        "property": "#c5e1ff",
+        "string": "#1ee646",
+        "number": "#ffd9ba",
+        "comment": "#80c201",
+        "operator": "#f5f5f5",
+        "tag": "#d3bdff",
+        "attribute": "#ffdb9e",
+        "regex": "#f3989e",
+        "invalid": "#ffd7d2",
+        "added": "#01ea45",
+        "removed": "#f39992",
+        "changed": "#c9e0ff"
+      },
+      "terminal": {
+        "ansi": [
+          "#a3a3a3",
+          "#ffa79b",
+          "#1bdb41",
+          "#f0b40b",
+          "#90c1ff",
+          "#f7a0f1",
+          "#37d2cf",
+          "#e6e6e6",
+          "#c8c8c8",
+          "#ffd5ce",
+          "#34ff57",
+          "#ffda8a",
+          "#c9e0ff",
+          "#ffd0fa",
+          "#23f6f8",
+          "#ffffff"
+        ],
+        "dim": [],
+        "backgroundRole": [],
+        "textRole": [
+          15
+        ]
+      }
+    },
+    {
+      "id": "yellow-on-black",
+      "name": "Zacess Yellow on Black",
+      "appearance": "dark",
+      "vscodeUiTheme": "hc-black",
+      "readerProfile": "yellow_on_black",
+      "description": "Yellow on black for low vision, the reader's Yellow on black theme.",
+      "ui": {
+        "background": "#000000",
+        "foreground": "#ffeb3b",
+        "surface": "#000000",
+        "surfaceAlt": "#0d0d0d",
+        "muted": "#e6e6e6",
+        "border": "#7a7a7a",
+        "borderActive": "#ffeb3b",
+        "accent": "#ffeb3b",
+        "accentForeground": "#000000",
+        "link": "#1be4ed",
+        "selection": "#024b4e",
+        "selectionStrong": "#09bcc4",
+        "selectionForeground": "#000000",
+        "listSelection": "#0a2257",
+        "lineHighlight": "#141414",
+        "cursor": "#ffffff",
+        "gutter": "#000000",
+        "lineNumber": "#d9d9d9",
+        "lineNumberActive": "#ffeb3b",
+        "findMatch": "#3d3000",
+        "findMatchBorder": "#ffffff",
+        "error": "#ffbeb5",
+        "warning": "#ffd8ab",
+        "info": "#a6d2ff",
+        "diffAddedBackground": "#0d2a12",
+        "diffRemovedBackground": "#3a0e0e",
+        "indentGuide": "#8c8c8c",
+        "whitespace": "#9a9a9a",
+        "code": "#ffffff"
+      },
+      "syntax": {
+        "foreground": "#ffeb3b",
+        "keyword": "#ffffff",
+        "control": "#0cedf6",
+        "function": "#88c3ff",
+        "type": "#e5c7ff",
+        "variable": "#ffeb3b",
+        "parameter": "#ffcca3",
+        "property": "#ffffff",
+        "string": "#43f480",
+        "number": "#ffa77e",
+        "comment": "#88c200",
+        "operator": "#ffeb3b",
+        "tag": "#ffffff",
+        "attribute": "#ffffff",
+        "regex": "#ffa1ce",
+        "invalid": "#ffa59d",
+        "added": "#28f74f",
+        "removed": "#ffa59d",
+        "changed": "#ddedff"
+      },
+      "terminal": {
+        "foreground": "#ffffff",
+        "cursor": "#ffeb3b",
+        "ansi": [
+          "#a3a3a3",
+          "#ffa79b",
+          "#01dc3f",
+          "#edb618",
+          "#90c1ff",
+          "#fd9cf8",
+          "#1fd3d3",
+          "#d9d9d9",
+          "#c8c8c8",
+          "#ffd5ce",
+          "#3cff5d",
+          "#ffda8a",
+          "#c9e0ff",
+          "#ffd0fa",
+          "#00f7f5",
+          "#ffffff"
+        ],
+        "dim": [],
+        "backgroundRole": [],
+        "textRole": [
+          15
+        ]
+      }
+    },
+    {
+      "id": "cream",
+      "name": "Zacess Cream",
+      "appearance": "light",
+      "vscodeUiTheme": "vs",
+      "readerProfile": "black_on_cream",
+      "description": "Black on cream for dyslexia, the reader's Black on cream theme.",
+      "ui": {
+        "background": "#fdf6e3",
+        "foreground": "#000000",
+        "surface": "#f2efe9",
+        "surfaceAlt": "#e9e5dd",
+        "muted": "#3f382c",
+        "border": "#6e6555",
+        "borderActive": "#004498",
+        "accent": "#004498",
+        "accentForeground": "#ffffff",
+        "link": "#004498",
+        "selection": "#c8a9ff",
+        "selectionStrong": "#7401ca",
+        "selectionForeground": "#fdf6e3",
+        "listSelection": "#f9e79a",
+        "lineHighlight": "#f3ead2",
+        "cursor": "#000000",
+        "gutter": "#fdf6e3",
+        "lineNumber": "#4a4337",
+        "lineNumberActive": "#000000",
+        "findMatch": "#ffd400",
+        "findMatchBorder": "#000000",
+        "error": "#770004",
+        "warning": "#513100",
+        "info": "#00357a",
+        "diffAddedBackground": "#e4f1d8",
+        "diffRemovedBackground": "#f9e3d8",
+        "indentGuide": "#857b69",
+        "whitespace": "#766c5b"
+      },
+      "syntax": {
+        "foreground": "#000000",
+        "keyword": "#530093",
+        "control": "#550036",
+        "function": "#004498",
+        "type": "#003232",
+        "variable": "#000000",
+        "parameter": "#441f00",
+        "property": "#020068",
+        "string": "#00440c",
+        "number": "#451700",
+        "comment": "#8b0162",
+        "operator": "#000000",
+        "tag": "#530093",
+        "attribute": "#3a1f00",
+        "regex": "#52001c",
+        "invalid": "#540002",
+        "added": "#005512",
+        "removed": "#540002",
+        "changed": "#001538"
+      },
+      "terminal": {
+        "ansi": [
+          "#000000",
+          "#c1000a",
+          "#016f1b",
+          "#815601",
+          "#015ac2",
+          "#a901a6",
+          "#016969",
+          "#434343",
+          "#484848",
+          "#df0010",
+          "#008120",
+          "#966501",
+          "#0069e3",
+          "#c500bf",
+          "#027b7b",
+          "#000000"
+        ],
+        "dim": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "backgroundRole": [],
+        "textRole": [
+          0,
+          15
+        ]
+      }
+    },
+    {
+      "id": "high-contrast-dark",
+      "name": "Zacess High Contrast Dark",
+      "appearance": "dark",
+      "vscodeUiTheme": "hc-black",
+      "readerProfile": "light_on_dark",
+      "description": "White on black with strong borders and a yellow focus ring, for the highest contrast on a dark screen.",
+      "ui": {
+        "background": "#000000",
+        "foreground": "#ffffff",
+        "surface": "#000000",
+        "surfaceAlt": "#0f0f0f",
+        "muted": "#e0e0e0",
+        "border": "#a6a6a6",
+        "borderActive": "#f5c400",
+        "accent": "#f5c400",
+        "accentForeground": "#000000",
+        "link": "#8fd0ff",
+        "selection": "#6501ae",
+        "selectionStrong": "#bf96ff",
+        "selectionForeground": "#000000",
+        "listSelection": "#0a2552",
+        "lineHighlight": "#1a1a1a",
+        "cursor": "#f5c400",
+        "gutter": "#000000",
+        "lineNumber": "#e6e6e6",
+        "lineNumberActive": "#f5c400",
+        "findMatch": "#403300",
+        "findMatchBorder": "#f5c400",
+        "error": "#ff9e94",
+        "warning": "#ffd28a",
+        "info": "#a9d4ff",
+        "diffAddedBackground": "#00290d",
+        "diffRemovedBackground": "#3d0008",
+        "indentGuide": "#8c8c8c",
+        "whitespace": "#8c8c8c"
+      },
+      "syntax": {
+        "foreground": "#ffffff",
+        "keyword": "#f5c400",
+        "control": "#ffcdf0",
+        "function": "#8fd0ff",
+        "type": "#00f4e0",
+        "variable": "#ffffff",
+        "parameter": "#ffcf9e",
+        "property": "#c9a8ff",
+        "string": "#20fe34",
+        "number": "#ffb27a",
+        "comment": "#c7b404",
+        "operator": "#ffffff",
+        "tag": "#f5c400",
+        "attribute": "#fff0b8",
+        "regex": "#ffa6c9",
+        "invalid": "#ff9e94",
+        "added": "#3bff59",
+        "removed": "#ffaba3",
+        "changed": "#e6f2ff"
+      },
+      "terminal": {
+        "ansi": [
+          "#b3b3b3",
+          "#ff9e94",
+          "#26f444",
+          "#f5c400",
+          "#8fd0ff",
+          "#f2a6ff",
+          "#00f4e0",
+          "#e0e0e0",
+          "#cccccc",
+          "#ffc4bd",
+          "#95ff98",
+          "#ffe08a",
+          "#c8e6ff",
+          "#ffcdf7",
+          "#56fff3",
+          "#ffffff"
+        ],
+        "dim": [],
+        "backgroundRole": [],
+        "textRole": [
+          15
+        ]
+      }
+    },
+    {
+      "id": "high-contrast-light",
+      "name": "Zacess High Contrast Light",
+      "appearance": "light",
+      "vscodeUiTheme": "hc-light",
+      "readerProfile": "dark_on_light",
+      "description": "Black on white with strong dark borders and focus outlines, for the highest contrast on a light screen.",
+      "ui": {
+        "background": "#ffffff",
+        "foreground": "#000000",
+        "surface": "#f7f7f7",
+        "surfaceAlt": "#efefef",
+        "muted": "#2e2e2e",
+        "border": "#262626",
+        "borderActive": "#003d99",
+        "accent": "#003d99",
+        "accentForeground": "#ffffff",
+        "link": "#003d99",
+        "selection": "#00d3d0",
+        "selectionStrong": "#015f5e",
+        "selectionForeground": "#ffffff",
+        "listSelection": "#fff1a0",
+        "lineHighlight": "#f2f2f2",
+        "cursor": "#000000",
+        "gutter": "#ffffff",
+        "lineNumber": "#262626",
+        "lineNumberActive": "#000000",
+        "findMatch": "#ffd400",
+        "findMatchBorder": "#000000",
+        "error": "#8b0000",
+        "warning": "#5a3a00",
+        "info": "#00337f",
+        "diffAddedBackground": "#e0f5e3",
+        "diffRemovedBackground": "#fde4e4",
+        "indentGuide": "#6e6e6e",
+        "whitespace": "#6e6e6e"
+      },
+      "syntax": {
+        "foreground": "#000000",
+        "keyword": "#4b0091",
+        "control": "#8a0046",
+        "function": "#00347f",
+        "type": "#004f4e",
+        "variable": "#000000",
+        "parameter": "#6b3100",
+        "property": "#1e0090",
+        "string": "#005518",
+        "number": "#521e00",
+        "comment": "#1701fb",
+        "operator": "#000000",
+        "tag": "#4b0091",
+        "attribute": "#4f3200",
+        "regex": "#720030",
+        "invalid": "#600000",
+        "added": "#005518",
+        "removed": "#4a0000",
+        "changed": "#00307a"
+      },
+      "terminal": {
+        "ansi": [
+          "#000000",
+          "#ca0000",
+          "#017424",
+          "#875b00",
+          "#005bdc",
+          "#b400ac",
+          "#006f6e",
+          "#3d3d3d",
+          "#333333",
+          "#e90100",
+          "#018726",
+          "#9c6a01",
+          "#016eee",
+          "#cf00c6",
+          "#028181",
+          "#000000"
+        ],
+        "dim": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "backgroundRole": [],
+        "textRole": [
+          0,
+          15
+        ]
+      }
+    },
+    {
+      "id": "deep-contrast-dark",
+      "name": "Zacess Deep Contrast Dark",
+      "appearance": "dark",
+      "vscodeUiTheme": "hc-black",
+      "readerProfile": "light_on_dark",
+      "description": "White on black with deep, fully saturated colours, yellow focus outlines and cyan frames, for low vision.",
+      "ui": {
+        "background": "#000000",
+        "foreground": "#ffffff",
+        "surface": "#000000",
+        "surfaceAlt": "#0a0a0a",
+        "muted": "#b3b3b3",
+        "border": "#00ffff",
+        "borderActive": "#ffff00",
+        "accent": "#00ffff",
+        "accentForeground": "#000000",
+        "link": "#1db4ff",
+        "selection": "#720072",
+        "selectionStrong": "#ff70ff",
+        "selectionForeground": "#000000",
+        "listSelection": "#1c1c38",
+        "lineHighlight": "#141414",
+        "cursor": "#ffff00",
+        "gutter": "#000000",
+        "lineNumber": "#ffffff",
+        "lineNumberActive": "#ffff00",
+        "findMatch": "#403300",
+        "findMatchBorder": "#ffff00",
+        "error": "#fe8167",
+        "warning": "#ffd370",
+        "info": "#59a4f9",
+        "diffAddedBackground": "#002200",
+        "diffRemovedBackground": "#330000",
+        "indentGuide": "#8c8c8c",
+        "whitespace": "#8c8c8c"
+      },
+      "syntax": {
+        "foreground": "#ffffff",
+        "keyword": "#67aeff",
+        "control": "#ffabfd",
+        "function": "#ffdf5a",
+        "type": "#00ebb1",
+        "variable": "#ffffff",
+        "parameter": "#ffffff",
+        "property": "#c195ff",
+        "string": "#ffaa7c",
+        "number": "#e19e00",
+        "comment": "#00c600",
+        "operator": "#ffffff",
+        "tag": "#67aeff",
+        "attribute": "#c195ff",
+        "regex": "#ff80c5",
+        "invalid": "#fd8b78",
+        "added": "#00f000",
+        "removed": "#ffaa7c",
+        "changed": "#67aeff"
+      },
+      "terminal": {
+        "ansi": [
+          "#000000",
+          "#ff5f5f",
+          "#00cd00",
+          "#cdcd00",
+          "#8888ff",
+          "#ff2aff",
+          "#00cdcd",
+          "#e5e5e5",
+          "#b8b8b8",
+          "#ff9e9e",
+          "#00ff00",
+          "#ffff00",
+          "#b0b0ff",
+          "#ff8fff",
+          "#00ffff",
+          "#ffffff"
+        ],
+        "dim": [],
+        "backgroundRole": [
+          0
+        ],
+        "textRole": [
+          15
+        ]
+      }
+    },
+    {
+      "id": "deep-contrast-light",
+      "name": "Zacess Deep Contrast Light",
+      "appearance": "light",
+      "vscodeUiTheme": "hc-light",
+      "readerProfile": "dark_on_light",
+      "description": "Black on white with vivid deep colours, red focus outlines and navy frames, for low vision.",
+      "ui": {
+        "background": "#ffffff",
+        "foreground": "#000000",
+        "surface": "#ffffff",
+        "surfaceAlt": "#ffffff",
+        "muted": "#4d4d4d",
+        "border": "#0f4a85",
+        "borderActive": "#b5200d",
+        "accent": "#0f4a85",
+        "accentForeground": "#ffffff",
+        "link": "#003df6",
+        "selection": "#ffbcfa",
+        "selectionStrong": "#990098",
+        "selectionForeground": "#ffffff",
+        "listSelection": "#f0f5ff",
+        "lineHighlight": "#f5f5f5",
+        "cursor": "#000000",
+        "gutter": "#ffffff",
+        "lineNumber": "#000000",
+        "lineNumberActive": "#000000",
+        "findMatch": "#fff1a0",
+        "findMatchBorder": "#b5200d",
+        "error": "#aa0000",
+        "warning": "#674100",
+        "info": "#002ec2",
+        "diffAddedBackground": "#eefaee",
+        "diffRemovedBackground": "#fff3f3",
+        "indentGuide": "#6e6e6e",
+        "whitespace": "#6e6e6e"
+      },
+      "syntax": {
+        "foreground": "#000000",
+        "keyword": "#002ec2",
+        "control": "#950094",
+        "function": "#824100",
+        "type": "#003a39",
+        "variable": "#000000",
+        "parameter": "#000000",
+        "property": "#2e0078",
+        "string": "#870000",
+        "number": "#a3005f",
+        "comment": "#006108",
+        "operator": "#000000",
+        "tag": "#002ec2",
+        "attribute": "#2e0078",
+        "regex": "#a60049",
+        "invalid": "#aa0000",
+        "added": "#006108",
+        "removed": "#730000",
+        "changed": "#002ec2"
+      },
+      "terminal": {
+        "ansi": [
+          "#000000",
+          "#ca0000",
+          "#00892e",
+          "#ad6500",
+          "#0040ff",
+          "#cd01cd",
+          "#016e78",
+          "#595959",
+          "#404040",
+          "#d14100",
+          "#00884f",
+          "#907300",
+          "#0d00ff",
+          "#db009a",
+          "#0178c1",
+          "#000000"
+        ],
+        "dim": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14
+        ],
+        "backgroundRole": [],
+        "textRole": [
+          0,
+          15
+        ]
+      }
+    }
+  ]
+}

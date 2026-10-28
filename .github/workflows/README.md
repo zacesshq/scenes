@@ -1,0 +1,10 @@
+# Workflows
+
+| Workflow | Runs on | What it does |
+| --- | --- | --- |
+| [`ci.yml`](ci.yml) | Push to `main` and pull requests | On Linux, macOS and Windows: checks formatting, runs Clippy with warnings as errors and runs the tests. On Linux it also regenerates `src/palette.rs` from `palette/zacess.json` and fails if the committed table differs. Then it draws every scene in every theme without a terminal at 20 by 8 and 120 by 40 and fails if any frame is empty, printing one 80 by 24 frame per scene in the log so a reviewer can look at it. A separate Linux job checks that everything still builds with Rust 1.85, the `rust-version` in `Cargo.toml` |
+| [`release.yml`](release.yml) | A tag starting with `v`, such as `v0.1.0` | Builds a release binary for Apple silicon and Intel Macs, static Linux binaries for x86-64 and ARM64 (musl) and 64 bit Windows with the C runtime linked statically (set in `.cargo/config.toml`), packs each with the README, licence, notice, changelog and accessibility statement plus a SHA-256 file and attaches them to the GitHub release of that tag. The release is made by a maintainer from a signed tag, so the workflow waits up to twenty minutes for it to exist and never creates one itself. Rerunning it replaces the files. Attaching files to a published release needs immutable releases to stay off for this repository |
+| [`markdownlint.yml`](markdownlint.yml) | Push to `main` and pull requests, also run by hand | Lints every markdown file with the rules in `.markdownlint.json` |
+
+Every action is pinned to a full commit SHA with its version in a comment. Dependabot proposes updates
+weekly for the actions and the Cargo dependencies.
