@@ -106,7 +106,7 @@ the same phrase for each event, so the meaning carries over; only the timbre dif
 Zacess Scenes is not on crates.io yet, so Cargo installs it from a release tag here:
 
 ```sh
-cargo install --locked --git https://github.com/zacesshq/scenes --tag v0.3.0 zacess-scenes
+cargo install --locked --git https://github.com/zacesshq/scenes --tag v0.4.0 zacess-scenes
 ```
 
 Rust 1.85 or later and a C compiler, since Lua 5.4 is built into the program. The dependencies are
@@ -128,8 +128,8 @@ Each archive has a `.sha256` file beside it. Check the sum, unpack the archive a
 `zacess-scenes` (or `zacess-scenes.exe`) somewhere on your `PATH`.
 
 ```sh
-shasum -a 256 -c zacess-scenes-v0.3.0-aarch64-apple-darwin.tar.gz.sha256
-tar -xzf zacess-scenes-v0.3.0-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c zacess-scenes-v0.4.0-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf zacess-scenes-v0.4.0-aarch64-apple-darwin.tar.gz
 ```
 
 ## Accessibility

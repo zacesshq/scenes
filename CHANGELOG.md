@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-29
+
 ### Added
 
 - Two sound sets, `piano` and `rain`, so there are eight. The piano has a felt hammer strike and a warm low ring, its overtones a little sharp of whole multiples as a stiff string's are. The rain set plays each note as a water droplet whose pitch rises as it rings, over a soft bed of filtered rain. Both play the same phrase for each event as the other sets and are levelled to the same loudness.
@@ -85,7 +87,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The README, this changelog, the accessibility statement, the contributing guide, the security policy, the support guide, the code of conduct, a licensing notice for the Zacess mark and the palette, issue forms for a bug, a scene idea and an accessibility problem, a pull request template, CODEOWNERS and Dependabot for the actions and the Cargo dependencies.
 - `docs/scenes.md`, which describes every scene and its reduced motion behaviour.
 
-[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/zacesshq/scenes/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/zacesshq/scenes/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/zacesshq/scenes/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zacesshq/scenes/releases/tag/v0.1.0
