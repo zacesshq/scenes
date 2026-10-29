@@ -57,19 +57,25 @@ pub fn interpret(key: KeyEvent) -> Input {
         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => Input::Quit,
         KeyCode::Char(' ') => Input::Pause,
         KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('?') => Input::Help,
+        // n moves on a scene; N and b go back, so the shifted key reads as the reverse
+        KeyCode::Char('n') => Input::Key('n'),
+        KeyCode::Char('N') | KeyCode::Char('b') | KeyCode::Char('B') => Input::Key('b'),
         _ => Input::None,
     }
 }
 
-/// Maps a key in the watch mode: `1` to `4`, `r`, `p` and `s` on top of the keys every mode has.
+/// Maps a key in the watch mode: `1` to `4`, `r`, `p`, `s`, `m`, `+` and `-` on top of the keys
+/// every mode has. `=` and `_` count as `+` and `-`, the same keys without Shift.
 pub fn interpret_watch(key: KeyEvent) -> Input {
     if key.kind != KeyEventKind::Press || key.modifiers.contains(KeyModifiers::CONTROL) {
         return interpret(key);
     }
     match key.code {
-        KeyCode::Char(c @ ('1'..='4' | 'r' | 'R' | 'p' | 'P' | 's' | 'S')) => {
+        KeyCode::Char(c @ ('1'..='4' | 'r' | 'R' | 'p' | 'P' | 's' | 'S' | 'm' | 'M')) => {
             Input::Key(c.to_ascii_lowercase())
         }
+        KeyCode::Char('+' | '=') => Input::Key('+'),
+        KeyCode::Char('-' | '_') => Input::Key('-'),
         _ => interpret(key),
     }
 }
@@ -112,6 +118,33 @@ fn restore() {
     }
 }
 
+/// How long the run loop has to end on its own after a termination signal before the program
+/// gives the terminal back and ends without it.
+#[cfg(unix)]
+pub const STOP_GRACE: Duration = Duration::from_secs(1);
+
+/// Listens for termination signals on a thread of its own. A signal sets `stop`, so the run loop
+/// ends and the terminal is restored as usual. When the terminal itself has gone, as when a tmux
+/// pane or an SSH session closes, crossterm's read loop never returns to the run loop and the
+/// program would spin on the closed terminal for ever; so if the loop has not ended within
+/// `STOP_GRACE`, the terminal is restored as far as it can be and the program ends.
+#[cfg(unix)]
+fn watch_signals(stop: Arc<AtomicBool>) -> io::Result<()> {
+    use signal_hook::consts::{SIGHUP, SIGINT, SIGQUIT, SIGTERM};
+    let mut signals = signal_hook::iterator::Signals::new([SIGTERM, SIGHUP, SIGQUIT, SIGINT])?;
+    std::thread::spawn(move || {
+        if let Some(signal) = signals.forever().next() {
+            stop.store(true, Ordering::SeqCst);
+            std::thread::sleep(STOP_GRACE);
+            if ACTIVE.load(Ordering::SeqCst) {
+                restore();
+                std::process::exit(128 + signal);
+            }
+        }
+    });
+    Ok(())
+}
+
 /// How colours reach the terminal.
 #[derive(Clone, Copy, Debug)]
 pub struct Paint {
@@ -144,14 +177,7 @@ impl Terminal {
     pub fn open(intro: &str) -> io::Result<Self> {
         let stop = Arc::new(AtomicBool::new(false));
         #[cfg(unix)]
-        for signal in [
-            signal_hook::consts::SIGTERM,
-            signal_hook::consts::SIGHUP,
-            signal_hook::consts::SIGQUIT,
-            signal_hook::consts::SIGINT,
-        ] {
-            signal_hook::flag::register(signal, Arc::clone(&stop))?;
-        }
+        watch_signals(Arc::clone(&stop))?;
         let mut out = io::stdout();
         writeln!(out, "{intro}")?;
         out.flush()?;
@@ -411,6 +437,30 @@ mod tests {
             interpret(key(KeyCode::Char('r'), KeyModifiers::NONE)),
             Input::None
         );
+        for (c, wanted) in [
+            ('m', 'm'),
+            ('M', 'm'),
+            ('+', '+'),
+            ('=', '+'),
+            ('-', '-'),
+            ('_', '-'),
+        ] {
+            assert_eq!(
+                interpret_watch(key(KeyCode::Char(c), KeyModifiers::NONE)),
+                Input::Key(wanted),
+                "{c}"
+            );
+        }
+        for (c, wanted) in [('n', 'n'), ('N', 'b'), ('b', 'b'), ('B', 'b')] {
+            assert_eq!(
+                interpret(key(KeyCode::Char(c), KeyModifiers::NONE)),
+                Input::Key(wanted)
+            );
+            assert_eq!(
+                interpret_watch(key(KeyCode::Char(c), KeyModifiers::SHIFT)),
+                Input::Key(wanted)
+            );
+        }
     }
 
     #[test]

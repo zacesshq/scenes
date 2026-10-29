@@ -23,6 +23,19 @@ The released binary is built from these crates, each linked in rather than bundl
 | --- | --- | --- |
 | crossterm | Raw mode, the alternate screen, colours and keys | MIT |
 | signal-hook (Unix only) | Restoring the terminal on a termination signal | MIT or Apache-2.0 |
+| mlua | Running Lua scenes of the user's own in a sandbox | MIT |
+| lua-src | The Lua 5.4 source, compiled into the binary so nothing needs installing | MIT |
+
+mlua also links a few small crates of its own (bstr, either, memchr, num-traits, parking_lot,
+rustc-hash and smallvec, with their own dependencies), each under MIT or Apache-2.0 at the
+user's choice; memchr is also offered under the Unlicense.
+
+## Lua
+
+The Lua scenes run on [Lua 5.4](https://www.lua.org/), copyright Lua.org, PUC-Rio, under the
+[MIT licence](https://www.lua.org/license.html). It is compiled from source into the binary
+through lua-src and reached through mlua. `examples/scenes/lantern.lua` and the starter script
+that `zacess-scenes scene new` writes are our own and under this project's MIT licence.
 
 ## bacon
 
@@ -34,8 +47,13 @@ process and reads the JSON report it writes to a temporary file.
 
 ## Sounds
 
-The watch mode's tones are synthesised by the program's own code in `src/sound.rs` when they are
-first needed. No recorded audio is bundled.
+The watch mode's six sound sets are synthesised by the program's own code in `src/sound.rs` when
+they are first needed. No recorded audio is bundled.
+
+## Scenes and gallery
+
+Every scene, its captions and the stills in `docs/images/scenes` and the frames in `docs/frames`
+are our own, drawn by the program itself and covered by this project's MIT licence.
 
 ## Methods
 

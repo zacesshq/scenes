@@ -46,8 +46,10 @@ A scene is one file in `src/scenes` that implements the `Scene` trait in `src/sc
 - `resize` fits the scene to a size. It is called before the first frame and on every resize, so
   everything that depends on the size is worked out there. Treat 20 columns by 8 rows as the
   smallest size and leave out what does not fit rather than squeezing it in.
-- `step` advances the simulation by a number of seconds. Multiply every speed by
-  `Motion::speed()` and read `motion.calm` for anything that should be left out or slowed further
+- `step` advances the simulation by a number of seconds. Multiply every movement by
+  `Motion::speed()`, anything that changes in place (a pulse, a flicker, a wing beat) by
+  `Motion::pace()` (which never goes above the standard pace) and counts by `Motion::busy()` or
+  `Motion::scaled()`. Read `motion.calm` for anything that should be left out or slowed further
   under reduced motion.
 - `draw` draws into a cleared `Frame` using only colours from the `ThemeData` it is given, so the
   contrast test can prove every colour. Draw with the role methods (`theme.cyan()`,
@@ -55,12 +57,22 @@ A scene is one file in `src/scenes` that implements the `Scene` trait in `src/sc
 
 Then:
 
-1. Add it to `SCENES` and `create` in `src/scenes/mod.rs`, with a one-line summary.
+1. Give the file a `SUMMARY` and at least three `CAPTIONS` and add it to `SCENES` and `create` in
+   `src/scenes/mod.rs` with its kind: `Pass` for a calm scene for a passing build, `Fail` for a
+   slow, serious one for a failing build. A fail scene progresses slowly and then holds, so it still
+   looks right after an hour.
 2. Give it a `passes_the_shared_checks` test and a `check_determinism` test, like the others, plus
    a test for the thing that makes the scene itself, such as the bolt's timing or the bank's depth.
+   `check_scene` draws it in every theme at four sizes and six motion settings and runs the flash
+   meter over a simulated minute.
 3. Describe it in `docs/scenes.md` and add a row to the scene table in the README, including what it
    does under reduced motion.
-4. Add it to the scene lists in the two issue forms under `.github/ISSUE_TEMPLATE`.
+4. Run `scripts/snapshots.sh` to add its still to the gallery and add it to the gallery table in the
+   README. CI fails when a still is out of date.
+5. Add it to the scene lists in the two issue forms under `.github/ISSUE_TEMPLATE`.
+
+A scene can also start life as a Lua script, which needs no Rust at all; see
+[docs/lua.md](docs/lua.md).
 
 > [!IMPORTANT]
 > Nothing may flash. Nothing that changes in place may change a cell more than three times a

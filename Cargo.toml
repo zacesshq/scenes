@@ -10,7 +10,7 @@ homepage = "https://zacess.com"
 readme = "README.md"
 keywords = ["terminal", "animation", "accessibility", "screensaver", "high-contrast"]
 categories = ["command-line-utilities", "accessibility"]
-exclude = [".github/", "packaging/", "scripts/", "palette/"]
+exclude = [".github/", "packaging/", "scripts/", "palette/", "docs/images/", "docs/frames/"]
 
 [lib]
 name = "zacess_scenes"
@@ -22,6 +22,8 @@ path = "src/main.rs"
 
 [dependencies]
 crossterm = "0.29"
+# lua 5.4 compiled from source into the binary, so user scenes need nothing installed
+mlua = { version = "0.11.6", default-features = false, features = ["lua54", "vendored"] }
 
 [target.'cfg(unix)'.dependencies]
 # already a dependency of crossterm on Unix; used directly to restore the terminal on SIGTERM

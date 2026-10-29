@@ -47,6 +47,24 @@ jobs:
         run: |
           python3 scripts/build-palette.py
           git diff --exit-code src/palette.rs
+      - name: Check the gallery stills and showcase frames are current
+        if: runner.os == 'Linux'
+        run: |
+          ./scripts/snapshots.sh
+          git status --porcelain docs/images docs/frames
+          git diff --exit-code docs/images docs/frames
+          test -z "$(git status --porcelain docs/images docs/frames)"
+      - name: Render the example Lua scene
+        shell: bash
+        run: |
+          cargo build -q
+          bin=target/debug/zacess-scenes
+          [ -x "$bin" ] || bin="$bin.exe"
+          export ZACESS_CONFIG="$PWD/target/ci-config/scenes.toml"
+          mkdir -p target/ci-config/scenes
+          cp examples/scenes/lantern.lua target/ci-config/scenes/
+          "$bin" list | grep -E "lantern +pass"
+          "$bin" lantern --headless --frames 60 --size 60x20 --seed 1
       - name: Render every scene in every theme without a terminal
         shell: bash
         run: |
@@ -64,6 +82,40 @@ jobs:
             "$bin" "$scene" --theme deep-dark --headless --frames 30 --size 80x24 --seed 1
             echo "::endgroup::"
           done
+
+  release-targets:
+    # the release builds compile Lua from source with each target's C compiler, so every
+    # target is built on each pull request rather than first meeting it at a release
+    name: Release build ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: Set up the musl cross toolchain
+        if: contains(matrix.target, 'musl')
+        uses: taiki-e/setup-cross-toolchain-action@12b7ad4acfa95a1476779d6c06699b96ec1691f8 # v1.42.0
+        with:
+          target: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: ${{ matrix.target }}
+      - run: cargo build --release --locked --target ${{ matrix.target }}
 
   msrv:
     name: Minimum Rust version

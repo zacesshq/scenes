@@ -3,9 +3,10 @@
 use std::io;
 use std::time::{Duration, Instant};
 
+use crate::catalogue::Catalogue;
 use crate::frame::Frame;
 use crate::rng::Rng;
-use crate::scene::Scene;
+use crate::scene::{Motion, Scene};
 use crate::terminal::{Input, Terminal};
 use crate::theme::ThemeData;
 
@@ -21,6 +22,11 @@ pub const RESIZE_SETTLE: Duration = Duration::from_millis(150);
 /// The shortest time between two pause toggles. Without it a held Space key, which most
 /// terminals send as a stream of presses, would flash the paused line on and off.
 pub const PAUSE_DEBOUNCE: Duration = Duration::from_millis(300);
+/// The shortest time between two scene changes from the keyboard, so a held or hammered key
+/// never replaces the whole picture more than three times a second.
+pub const SCENE_DEBOUNCE: Duration = Duration::from_millis(400);
+/// Seconds a scene's name stays on the bottom row after `n` or `b`, before it dims and goes.
+pub const LABEL_SHOWN: f32 = 2.5;
 /// How long the loop waits for a key while nothing on screen can change: paused with the help
 /// line gone. Short enough that a termination signal is still acted on promptly.
 pub const IDLE_POLL: Duration = Duration::from_millis(500);
@@ -65,8 +71,12 @@ pub fn help_text(width: usize, paused: bool) -> &'static str {
         } else {
             "Paused: Space"
         }
+    } else if width >= 84 {
+        "Space pauses, n and b change the scene, h shows this again, q, Esc or Ctrl+C quits."
     } else if width >= 58 {
-        "Space pauses, h shows this again, q, Esc or Ctrl+C quits."
+        "Space pauses, n next scene, h shows this again, q quits."
+    } else if width >= 36 {
+        "Space pauses, n next, q or Esc quits"
     } else if width >= 30 {
         "Space pauses, q or Esc quits"
     } else {
@@ -76,8 +86,29 @@ pub fn help_text(width: usize, paused: bool) -> &'static str {
 
 /// Draws the help or paused line on the bottom row. `help_age` is the seconds since the help was
 /// asked for (`None` once it has faded). The line is drawn in the text colour, then the muted
-/// colour, then not at all, so it never flashes.
-pub fn overlay(frame: &mut Frame, theme: &ThemeData, paused: bool, help_age: Option<f32>) {
+/// colour, then not at all, so it never flashes. A label, such as a new scene's name, takes the
+/// help line's place while it shows.
+pub fn overlay(
+    frame: &mut Frame,
+    theme: &ThemeData,
+    paused: bool,
+    help_age: Option<f32>,
+    label: Option<(&str, f32)>,
+) {
+    let row = frame.height() as i32 - 1;
+    if !paused {
+        if let Some((text, age)) = label.filter(|(_, age)| *age < LABEL_SHOWN + HELP_FADING) {
+            let colour = if age < LABEL_SHOWN {
+                theme.foreground
+            } else {
+                theme.muted
+            };
+            let text: String = text.chars().take(frame.width()).collect();
+            frame.fill_row(row, ' ', None);
+            frame.put_str(0, row, &text, Some(colour));
+            return;
+        }
+    }
     let colour = if paused {
         theme.foreground
     } else {
@@ -87,7 +118,6 @@ pub fn overlay(frame: &mut Frame, theme: &ThemeData, paused: bool, help_age: Opt
             _ => return,
         }
     };
-    let row = frame.height() as i32 - 1;
     frame.fill_row(row, ' ', None);
     frame.put_str(0, row, help_text(frame.width(), paused), Some(colour));
 }
@@ -120,33 +150,111 @@ pub fn pause_accepted(last_press: &mut Option<Instant>, now: Instant) -> bool {
     accepted
 }
 
-/// Runs a scene in the terminal until a quit key, a termination signal or the duration ends.
+/// The scenes the standalone mode steps through with `n` and `b` and the one showing.
+pub struct Playlist<'a> {
+    pub catalogue: &'a mut Catalogue,
+    pub names: Vec<String>,
+    pub index: usize,
+    pub motion: Motion,
+}
+
+impl Playlist<'_> {
+    /// Builds the scene at the index, skipping any user scene whose script fails and retiring
+    /// it. Returns the scene and a note about anything skipped.
+    fn build(
+        &mut self,
+        width: usize,
+        height: usize,
+        rng: &mut Rng,
+    ) -> (Box<dyn Scene>, Option<String>) {
+        let mut note = None;
+        for _ in 0..self.names.len().max(1) {
+            let name = self.names[self.index % self.names.len()].clone();
+            match self
+                .catalogue
+                .create(&name, width, height, self.motion, rng)
+            {
+                Ok(scene) => return (scene, note),
+                Err(error) => {
+                    note = Some(error);
+                    self.catalogue.retire(&name);
+                    self.names.retain(|n| *n != name);
+                    if self.names.is_empty() {
+                        break;
+                    }
+                    self.index %= self.names.len();
+                }
+            }
+        }
+        self.names = vec!["sea".to_string()];
+        self.index = 0;
+        let scene = crate::scenes::create("sea", width, height, self.motion, rng)
+            .expect("the default scene is built in");
+        (scene, note)
+    }
+
+    fn step(&mut self, by: isize) {
+        let len = self.names.len().max(1) as isize;
+        self.index = (self.index as isize + by).rem_euclid(len) as usize;
+    }
+
+    fn current(&self) -> &str {
+        &self.names[self.index % self.names.len()]
+    }
+}
+
+/// Runs scenes in the terminal until a quit key, a termination signal or the duration ends. `n`
+/// and `b` move through the playlist.
 pub fn run(
-    scene: &mut dyn Scene,
+    playlist: &mut Playlist,
     theme: &ThemeData,
     settings: &Settings,
     rng: &mut Rng,
     terminal: &mut Terminal,
 ) -> io::Result<()> {
     let (width, height) = terminal.size()?;
-    scene.resize(width, height, rng);
+    let (mut scene, mut label) = {
+        let (scene, note) = playlist.build(width, height, rng);
+        (scene, note.map(|n| (format!("scene error: {n}"), 0.0)))
+    };
     let mut frame = Frame::new(width, height);
     let frame_time = Duration::from_secs_f32(settings.frame_time());
     let start = Instant::now();
     let mut last = Instant::now();
     let mut paused = false;
     let mut last_pause_press: Option<Instant> = None;
+    let mut last_scene_press: Option<Instant> = None;
     let mut help_age: Option<f32> = Some(0.0);
     let mut pending_resize: Option<(usize, usize, Instant)> = None;
     let mut needs_draw = true;
 
     loop {
-        // paused with the help gone, the picture cannot change, so it is not redrawn
-        let still = paused && help_age.is_none();
+        if let Some(problem) = scene.problem() {
+            let name = playlist.current().to_string();
+            playlist.catalogue.retire(&name);
+            playlist.names.retain(|n| *n != name);
+            if playlist.names.is_empty() {
+                playlist.names.push("sea".to_string());
+            }
+            playlist.index %= playlist.names.len();
+            let (w, h) = (frame.width(), frame.height());
+            scene = playlist.build(w, h, rng).0;
+            label = Some((format!("scene error: {problem}"), 0.0));
+            needs_draw = true;
+        }
+        // paused with the help and the label gone, the picture cannot change, so it is not
+        // redrawn
+        let still = paused && help_age.is_none() && label.is_none();
         if pending_resize.is_none() && (needs_draw || !still) {
             frame.clear();
             scene.draw(&mut frame, theme);
-            overlay(&mut frame, theme, paused, help_age);
+            overlay(
+                &mut frame,
+                theme,
+                paused,
+                help_age,
+                label.as_ref().map(|(t, a)| (t.as_str(), *a)),
+            );
             terminal.draw(&frame, settings.colour)?;
             needs_draw = false;
         }
@@ -184,6 +292,32 @@ pub fn run(
                         break;
                     }
                 }
+                Input::Key(key @ ('n' | 'b')) => {
+                    let now = Instant::now();
+                    let accepted =
+                        last_scene_press.is_none_or(|at| now.duration_since(at) >= SCENE_DEBOUNCE);
+                    last_scene_press = Some(now);
+                    if accepted {
+                        playlist.step(if key == 'n' { 1 } else { -1 });
+                        let (w, h) = (frame.width(), frame.height());
+                        let (next, note) = playlist.build(w, h, rng);
+                        scene = next;
+                        let summary = playlist
+                            .catalogue
+                            .find(playlist.current())
+                            .map(|e| e.summary.clone())
+                            .unwrap_or_default();
+                        label = Some((
+                            note.map(|n| format!("scene error: {n}"))
+                                .unwrap_or_else(|| format!("{}: {summary}", playlist.current())),
+                            0.0,
+                        ));
+                        needs_draw = true;
+                        if idle {
+                            break;
+                        }
+                    }
+                }
                 Input::Resize(w, h) => pending_resize = Some((w, h, Instant::now())),
                 Input::Key(_) | Input::None => {}
             }
@@ -209,6 +343,13 @@ pub fn run(
             *age += elapsed;
             if *age >= HELP_SHOWN + HELP_FADING {
                 help_age = None;
+                needs_draw = true;
+            }
+        }
+        if let Some((_, age)) = label.as_mut() {
+            *age += elapsed;
+            if *age >= LABEL_SHOWN + HELP_FADING {
+                label = None;
                 needs_draw = true;
             }
         }
@@ -252,7 +393,7 @@ mod tests {
 
     #[test]
     fn the_help_line_fits_every_width() {
-        for width in [20, 30, 48, 58, 120] {
+        for width in [20, 30, 36, 48, 58, 84, 120] {
             for paused in [false, true] {
                 let text = help_text(width, paused);
                 assert!(text.len() <= width, "{text} does not fit {width}");
@@ -287,21 +428,49 @@ mod tests {
     fn the_overlay_shows_then_dims_then_goes() {
         let theme = theme::default_theme();
         let mut frame = Frame::new(60, 10);
-        overlay(&mut frame, theme, false, Some(0.0));
+        overlay(&mut frame, theme, false, Some(0.0), None);
         assert!(frame.row_text(9).starts_with("Space pauses"));
         assert_eq!(frame.get(0, 9).unwrap().colour, Some(theme.foreground));
 
         frame.clear();
-        overlay(&mut frame, theme, false, Some(HELP_SHOWN + 0.5));
+        overlay(&mut frame, theme, false, Some(HELP_SHOWN + 0.5), None);
         assert_eq!(frame.get(0, 9).unwrap().colour, Some(theme.muted));
 
         frame.clear();
-        overlay(&mut frame, theme, false, None);
+        overlay(&mut frame, theme, false, None, None);
         assert_eq!(frame.drawn(), 0);
 
         frame.clear();
-        overlay(&mut frame, theme, true, None);
+        overlay(&mut frame, theme, true, None, None);
         assert!(frame.row_text(9).starts_with("Paused"));
+
+        frame.clear();
+        overlay(
+            &mut frame,
+            theme,
+            false,
+            Some(0.0),
+            Some(("koi-pond: a pond", 0.5)),
+        );
+        assert!(frame.row_text(9).starts_with("koi-pond"));
+        frame.clear();
+        overlay(
+            &mut frame,
+            theme,
+            false,
+            None,
+            Some(("koi-pond", LABEL_SHOWN + 0.5)),
+        );
+        assert_eq!(frame.get(0, 9).unwrap().colour, Some(theme.muted));
+        frame.clear();
+        overlay(
+            &mut frame,
+            theme,
+            false,
+            None,
+            Some(("koi-pond", LABEL_SHOWN + HELP_FADING)),
+        );
+        assert_eq!(frame.drawn(), 0);
     }
 
     #[test]

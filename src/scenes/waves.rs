@@ -48,7 +48,7 @@ impl Waves {
     }
 
     fn flap_period(&self) -> f32 {
-        FLAP_PERIOD / self.motion.speed()
+        FLAP_PERIOD / self.motion.pace()
     }
 }
 

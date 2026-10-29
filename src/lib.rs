@@ -5,17 +5,23 @@
 //! only module that touches a real terminal.
 
 pub mod app;
+pub mod catalogue;
 pub mod cli;
 pub mod colour;
+pub mod config;
+pub mod flash;
 pub mod frame;
 pub mod glyphs;
 pub mod json;
+pub mod lua;
 pub mod motion;
+pub mod notify;
 pub mod palette;
 pub mod report;
 pub mod rng;
 pub mod scene;
 pub mod scenes;
+pub mod snapshot;
 pub mod sound;
 pub mod terminal;
 pub mod theme;
