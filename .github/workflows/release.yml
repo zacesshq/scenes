@@ -106,3 +106,32 @@ jobs:
           TAG: ${{ github.ref_name }}
           ASSET: ${{ steps.package.outputs.asset }}
         run: gh release upload "$TAG" "$ASSET" "$ASSET.sha256" --repo "$GITHUB_REPOSITORY" --clobber
+
+  notify-site:
+    name: Tell the website
+    # runs once every platform's files are attached, so the site never reads a half-filled release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Tell the website about the release
+        env:
+          # an organisation secret: a fine-grained token limited to zacesshq/website with Contents read and write, which is what a repository dispatch needs
+          SITE_DISPATCH_TOKEN: ${{ secrets.SITE_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$SITE_DISPATCH_TOKEN" ]; then
+            echo "Skipped telling the website: the SITE_DISPATCH_TOKEN secret is not set. Its daily deploy picks up $GITHUB_REF_NAME instead." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          # the files are already attached, so a failed dispatch is reported but never fails the run
+          if curl -fsS -X POST \
+            -H "Authorization: Bearer $SITE_DISPATCH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            https://api.github.com/repos/zacesshq/website/dispatches \
+            -d "{\"event_type\":\"scenes-release\",\"client_payload\":{\"tag\":\"$GITHUB_REF_NAME\"}}"; then
+            echo "Asked zacess.com to rebuild with $GITHUB_REF_NAME." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Could not send the release to zacesshq/website; its daily deploy picks up $GITHUB_REF_NAME instead."
+            echo "Could not tell the website about $GITHUB_REF_NAME; its daily deploy picks it up instead." >> "$GITHUB_STEP_SUMMARY"
+          fi

@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Changed
+
+- A release now tells zacess.com to rebuild. Once every platform's files are attached, the release workflow sends a `scenes-release` repository dispatch naming the tag to `zacesshq/website`, so the site no longer waits for its daily deploy.
+
 ## [0.4.0] - 2026-10-29
 
 ### Added
