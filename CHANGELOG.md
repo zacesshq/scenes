@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Two sound sets, `piano` and `rain`, so there are eight. The piano has a felt hammer strike and a warm low ring, its overtones a little sharp of whole multiples as a stiff string's are. The rain set plays each note as a water droplet whose pitch rises as it rings, over a soft bed of filtered rain. Both play the same phrase for each event as the other sets and are levelled to the same loudness.
+
+### Changed
+
+- The README is shorter: the gallery, a quick start, the sound sets, install and accessibility, with a table of documentation pages. The detail moved into `docs/usage.md` (commands, keys, flags and headless rendering), `docs/watch-mode.md` (with notifications), `docs/sounds.md`, `docs/configuration.md`, `docs/themes.md` and `docs/snapshots.md`. The scene tables are at the top of `docs/scenes.md`.
+
 ### Fixed
 
 - The README installs with Cargo from the release tag on GitHub, since the crate is not on crates.io yet. It also lists mlua and the C compiler that building Lua needs.

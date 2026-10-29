@@ -65,8 +65,8 @@ Then:
    a test for the thing that makes the scene itself, such as the bolt's timing or the bank's depth.
    `check_scene` draws it in every theme at four sizes and six motion settings and runs the flash
    meter over a simulated minute.
-3. Describe it in `docs/scenes.md` and add a row to the scene table in the README, including what it
-   does under reduced motion.
+3. Describe it in `docs/scenes.md` and add a row to its table under "At a glance", including what it
+   does under reduced motion. The website reads that table.
 4. Run `scripts/snapshots.sh` to add its still to the gallery and add it to the gallery table in the
    README. CI fails when a still is out of date.
 5. Add it to the scene lists in the two issue forms under `.github/ISSUE_TEMPLATE`.

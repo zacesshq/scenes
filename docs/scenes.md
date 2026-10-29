@@ -9,6 +9,71 @@ What each scene draws, how it fits the screen, which of the theme's colours it u
 changes under reduced motion. Every scene implements the `Scene` trait in `src/scene.rs` and lives
 in its own file under `src/scenes`.
 
+## At a glance
+
+### The original scenes
+
+| Scene | What it shows | Under reduced motion |
+| --- | --- | --- |
+| `sea` | Fish of several sizes, bubbles, seaweed, a boat on the surface and, now and then, a whale crossing the deep water | Everything swims at half speed and fewer bubbles rise |
+| `rain` | Drops at two depths, ripples where they land and a distant bolt of lightning every few seconds at most | No lightning at all, slower rain |
+| `snow` | Flakes at two depths drifting down and settling into a bank along the bottom | Slower snow |
+| `starfield` | Stars that brighten and fade slowly, a crescent moon and, now and then, a slow shooting star | Stars take twice as long to change, shooting stars are rarer and slower |
+| `code-rain` | Columns of characters falling in the theme's syntax colours, each with a bright head | Columns fall at most three rows a second and their characters are never swapped |
+| `fireflies` | A dark meadow with lights that wander and pulse slowly | Slower, longer pulses and slower wandering |
+| `aurora` | Slow waves of colour across the top of a starry sky over a mountain ridge | The waves move at half speed |
+| `campfire` | Flames whose rows take a new shape one at a time, each at most once every 0.6 seconds, embers that rise and a steady glow on the ground | Each row changes at most once every 1.5 seconds, fewer and slower embers |
+| `waves` | A calm sea to the horizon under a sun, with gulls crossing the sky | Slower swell and slower wing beats |
+| `zacess` | The Zacess mark drifting slowly and bouncing gently off the edges | It drifts at half speed |
+
+### Pass scenes
+
+Calm scenes made for a passing build: nature, the city, space, water, the seasons, cosy rooms and
+two abstract pieces in the Zacess style.
+
+| Scene | What it shows | Under reduced motion |
+| --- | --- | --- |
+| `koi-pond` | A garden pond from above, with koi gliding on slow curves under lily pads, drifting flecks and a slow ripple now and then | Koi swim at half speed with still tails, fewer and slower ripples |
+| `harbour` | A harbour town at night, with lamps on the quay, their long shimmering reflections, moored boats swaying at their masts, a lighthouse and a passing ferry | Masts stay still, the shimmer changes half as often, the ferry is slower |
+| `lanterns` | Paper lanterns rising slowly from a dark lake at three depths, each with a reflection that slides down the water as it climbs | Lanterns rise, sway and drift at half speed |
+| `balloons` | Hot air balloons in three sizes lifting from behind three ridges of rolling hills under drifting clouds | Balloons rise and drift at half speed |
+| `countryside` | A steam train crossing open country, with hills, hedgerows, trees, the track and a fence sliding past at their own speeds | Every layer slides at half speed and smoke puffs half as often |
+| `winter-cabin` | A log cabin in the snow at night, with a lit window, chimney smoke, pines and gently falling snow | Snow and smoke move at half speed |
+| `autumn` | A tree in autumn colour dropping leaves that turn as they drift down and gather in a pile, with geese crossing now and then | Leaves fall at half the rate without turning |
+| `blossom` | A flowering branch letting petals go on a breeze, down to a stream that carries them away, with a bird on the branch | Petals fall and float at half speed without turning, the bird looks about half as often |
+| `city-night` | A night skyline where windows light and darken one at a time, a moon, a river and a train that crosses a bridge now and then | Windows change half as often and the train is slower and rarer |
+| `orbit` | A banded, shaded planet circled by a ring that passes behind it and in front of it, with a moon on a slow 40 second orbit | The moon takes 80 seconds to go round |
+| `constellations` | Stars joined slowly into named figures of our own, one group at a time, held and then faded | Lines are drawn at half speed and fade more slowly |
+| `tea` | A mug of tea with curling steam, books, a plant and a lamp, with rain or snow at the window | Fewer, slower puffs of steam and slower weather |
+| `cat-nap` | A cat asleep on a cushion, breathing slowly, with drifting z's, wool on the rug and a night window | Breaths, the tail and the z's take twice as long |
+| `garden` | Seeds that sprout, grow and bloom over a season of about two minutes, with butterflies, before the bed starts again | The season takes twice as long and wings beat half as often |
+| `tiles` | A grid of small pages with the Zacess fold, one tile changing colour at a time | Tiles change half as often |
+| `ribbons` | Ribbons of contour lines flowing slowly across a faint grid of dots | The ribbons flow at half speed |
+
+### Fail scenes
+
+Slow, serious scenes that read as something gone wrong without ever flashing, shaking or spinning.
+Each one progresses for about a minute, then holds or eases into a gentle loop, so it still looks
+right after an hour.
+
+| Scene | What it shows | Under reduced motion |
+| --- | --- | --- |
+| `storm` | Twice the rain of `rain`, slanting in a strong wind under two rows of cloud, with a bolt of lightning every 5 to 9 seconds at most and never in the first five | No lightning at all, slower rain |
+| `flood` | A street where the water rises slowly past the doors and holds with a gentle swell, debris drifting along the surface and a warning sign going under | The water rises, swells and drifts at half speed and the drizzle is halved |
+| `listing-ship` | A cargo ship on a grey sea that settles by the bow over a minute as its waterline creeps up past the portholes, then rolls gently while a lifebuoy drifts away | It lists, rolls and drifts at half speed |
+| `corrosion` | Riveted steel plates where rust creeps out from the rivets cell by cell to half the wall, darkening as it ages, with slow drips | Rust spreads and drips at half speed and each stage takes twice as long |
+| `tangle` | Cables hanging from a patch panel that slowly wander, cross and knot into a swaying snarl with a warning tag | The cables tangle and sway at half speed |
+| `wilt` | Potted plants on a sunny sill whose stems droop over, leaves dry and fall onto the sill and soil cracks | The plants wilt, sway and drop leaves at half speed |
+| `fog` | A road with signs, lamps and pines where a fog bank rolls in and the signs fade from view, glimpsed through gaps | The fog rolls in and drifts at half speed |
+| `broken-bridge` | A bridge over a flowing river with its middle span gone, girders hanging, the fallen span in the water, a barrier, a warning sign and a waiting car | The river and clouds move at half speed and fragments fall half as often |
+| `leak` | A cracked pipe dripping into a bucket that fills over a minute and then overflows into a puddle that spreads and holds, with a sinking pressure gauge and a wet floor sign | Drips come half as often and fall at half speed |
+| `blackout` | A night skyline whose lit windows go dark one at a time beside a snapped power line, leaving a few candles and windows on their own power | The windows go dark at half the rate and the clouds drift at half speed |
+| `traffic-jam` | Cars queued bumper to bumper before a stop line, cones and a signal stuck on red, with exhaust puffs drifting up | Cars roll in at half speed and puffs come half as often |
+| `erosion` | A cliff edge crumbling into the sea, stones tumbling and splashing and a fence left hanging over the drop until the face reaches harder rock | Pieces break away half as often and fall at half speed |
+| `drought` | Cracked earth spreading edge by edge under a heavy sun, a dry riverbed whose last puddle shrinks away, a withered tree and drifting dust | The cracks spread and the puddle dries at half the rate |
+
+## Common to every scene
+
 Common to all of them:
 
 - The scene is laid out again once a resize settles (no new size for 0.15 seconds), from 20
