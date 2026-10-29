@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
 ### Added
 
 - 16 new pass scenes: `koi-pond`, `harbour`, `lanterns`, `balloons`, `countryside`, `winter-cabin`, `autumn`, `blossom`, `city-night`, `orbit`, `constellations`, `tea`, `cat-nap`, `garden`, `tiles` and `ribbons`. With the original ten, 26 scenes can show while a build passes. Each has captions of its own.
@@ -71,6 +73,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The README, this changelog, the accessibility statement, the contributing guide, the security policy, the support guide, the code of conduct, a licensing notice for the Zacess mark and the palette, issue forms for a bug, a scene idea and an accessibility problem, a pull request template, CODEOWNERS and Dependabot for the actions and the Cargo dependencies.
 - `docs/scenes.md`, which describes every scene and its reduced motion behaviour.
 
-[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/zacesshq/scenes/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/zacesshq/scenes/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zacesshq/scenes/releases/tag/v0.1.0

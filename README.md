@@ -116,8 +116,8 @@ Each archive has a `.sha256` file beside it. Check the sum, unpack the archive a
 `zacess-scenes` (or `zacess-scenes.exe`) somewhere on your `PATH`.
 
 ```sh
-shasum -a 256 -c zacess-scenes-v0.2.0-aarch64-apple-darwin.tar.gz.sha256
-tar -xzf zacess-scenes-v0.2.0-aarch64-apple-darwin.tar.gz
+shasum -a 256 -c zacess-scenes-v0.3.0-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf zacess-scenes-v0.3.0-aarch64-apple-darwin.tar.gz
 ```
 
 ### Homebrew and winget
