@@ -47,7 +47,7 @@ process and reads the JSON report it writes to a temporary file.
 
 ## Sounds
 
-The watch mode's six sound sets are synthesised by the program's own code in `src/sound.rs` when
+The watch mode's eight sound sets are synthesised by the program's own code in `src/sound.rs` when
 they are first needed. No recorded audio is bundled.
 
 ## Scenes and gallery

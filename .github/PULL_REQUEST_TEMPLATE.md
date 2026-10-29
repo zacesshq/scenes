@@ -17,7 +17,7 @@
 - [ ] Nothing flashes and nothing that changes in place changes a cell more than three times a second (tick this too when no motion changed)
 - [ ] Reduced motion still slows the scene and removes lightning and flicker
 - [ ] Every colour drawn comes from the theme and the contrast test still passes
-- [ ] Any new key or flag is in the README, the help text and ACCESSIBILITY.md
+- [ ] Any new key or flag is in `docs/usage.md` or `docs/watch-mode.md`, the help text and ACCESSIBILITY.md
 
 ## Before submitting
 

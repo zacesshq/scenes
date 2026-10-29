@@ -14,6 +14,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicI32, Ordering};
 use std::time::Duration;
 
+use crate::rng::Rng;
+
 /// Samples a second. Plenty for short soft tones and small enough to write in an instant.
 pub const SAMPLE_RATE: u32 = 22_050;
 /// The default volume, out of 100.
@@ -36,7 +38,7 @@ const TAIL_FADE: f32 = 0.03;
 /// near half the sample rate they would alias.
 const HIGHEST_PARTIAL: f32 = 6000.0;
 /// Bumped whenever the synthesis changes, so a cached file from an older version is not reused.
-const SYNTH_VERSION: u32 = 2;
+const SYNTH_VERSION: u32 = 3;
 
 /// The environment variable that turns sound off: `0`, `false`, `no` or `off`.
 pub const SOUND_ENV: &str = "ZACESS_SOUND";
@@ -114,16 +116,20 @@ pub enum SoundSet {
     Pad,
     Chip,
     Glass,
+    Piano,
+    Rain,
 }
 
 impl SoundSet {
-    pub const ALL: [SoundSet; 6] = [
+    pub const ALL: [SoundSet; 8] = [
         SoundSet::Bells,
         SoundSet::Marimba,
         SoundSet::Kalimba,
         SoundSet::Pad,
         SoundSet::Chip,
         SoundSet::Glass,
+        SoundSet::Piano,
+        SoundSet::Rain,
     ];
 
     pub fn name(self) -> &'static str {
@@ -134,6 +140,8 @@ impl SoundSet {
             SoundSet::Pad => "pad",
             SoundSet::Chip => "chip",
             SoundSet::Glass => "glass",
+            SoundSet::Piano => "piano",
+            SoundSet::Rain => "rain",
         }
     }
 
@@ -145,6 +153,8 @@ impl SoundSet {
             SoundSet::Pad => "A soft synth pad that swells in and fades out",
             SoundSet::Chip => "Gentle 8-bit square waves, rounded so they never buzz",
             SoundSet::Glass => "Slow glassy tones like a wet finger on a rim",
+            SoundSet::Piano => "A soft grand piano, felt hammers and a warm low ring",
+            SoundSet::Rain => "Water droplets over a quiet bed of rain",
         }
     }
 
@@ -167,6 +177,8 @@ impl SoundSet {
                 decay: 5.0,
                 length: 0.75,
                 octave: 1.0,
+                glide: 0.0,
+                rain: 0.0,
             },
             // the fourth partial of a marimba bar dies away much faster than the fundamental,
             // which gives the wooden knock at the start
@@ -176,6 +188,8 @@ impl SoundSet {
                 decay: 7.0,
                 length: 0.5,
                 octave: 0.5,
+                glide: 0.0,
+                rain: 0.0,
             },
             // a tine's overtone is not a whole multiple, which is what makes it sound plucked
             // metal rather than a string
@@ -185,6 +199,8 @@ impl SoundSet {
                 decay: 4.0,
                 length: 0.7,
                 octave: 1.0,
+                glide: 0.0,
+                rain: 0.0,
             },
             SoundSet::Pad => Timbre {
                 partials: &[
@@ -198,6 +214,8 @@ impl SoundSet {
                 decay: 1.4,
                 length: 0.95,
                 octave: 0.5,
+                glide: 0.0,
+                rain: 0.0,
             },
             // odd harmonics at one over their number make a square wave; stopping at the ninth
             // keeps it soft and every partial well under half the sample rate
@@ -213,6 +231,8 @@ impl SoundSet {
                 decay: 3.0,
                 length: 0.3,
                 octave: 1.0,
+                glide: 0.0,
+                rain: 0.0,
             },
             SoundSet::Glass => Timbre {
                 partials: &[(1.0, 1.0, 1.0), (2.0, 0.06, 1.0), (4.0, 0.02, 1.0)],
@@ -220,19 +240,55 @@ impl SoundSet {
                 decay: 2.2,
                 length: 0.9,
                 octave: 1.0,
+                glide: 0.0,
+                rain: 0.0,
+            },
+            // a piano string is stiff, so each overtone sits a little above its whole multiple
+            // (n times the square root of 1 + 0.0004 n squared); the upper ones die away first,
+            // which gives the bright strike and the warm ring after it
+            SoundSet::Piano => Timbre {
+                partials: &[
+                    (1.0, 1.0, 1.0),
+                    (1.0015, 0.45, 1.0),
+                    (2.0016, 0.5, 1.6),
+                    (3.0054, 0.22, 2.3),
+                    (4.0128, 0.12, 3.0),
+                    (5.025, 0.06, 3.8),
+                ],
+                attack: 0.003,
+                decay: 3.2,
+                length: 0.9,
+                octave: 0.5,
+                glide: 0.0,
+                rain: 0.0,
+            },
+            // a falling drop rings as a bubble whose pitch rises as it closes, so each note
+            // glides up a little and dies fast over a soft bed of rain
+            SoundSet::Rain => Timbre {
+                partials: &[(1.0, 1.0, 1.0), (2.01, 0.1, 2.0)],
+                attack: 0.004,
+                decay: 9.0,
+                length: 0.6,
+                octave: 1.0,
+                glide: 0.6,
+                rain: 0.35,
             },
         }
     }
 }
 
 /// How a set sounds: its partials as a multiple of the pitch, a level and how much faster than
-/// the note they die away, plus the note's attack, decay rate, length and an octave shift.
+/// the note they die away, plus the note's attack, decay rate, length and an octave shift. `glide`
+/// raises each note's pitch by that share of itself every second and `rain` is the level of a soft
+/// noise bed under the whole tone.
 struct Timbre {
     partials: &'static [(f32, f32, f32)],
     attack: f32,
     decay: f32,
     length: f32,
     octave: f32,
+    glide: f32,
+    rain: f32,
 }
 
 /// One note of a phrase: its pitch, when it starts and its own level.
@@ -313,12 +369,37 @@ fn raw(set: SoundSet, tone: Tone) -> Vec<f32> {
                 if f > HIGHEST_PARTIAL {
                     continue;
                 }
-                wave += level * (-timbre.decay * fade * t).exp() * (TAU * f * t).sin();
+                // the phase of a pitch rising at a steady rate is the integral of the frequency
+                let phase = TAU * f * (t + timbre.glide * t * t / 2.0);
+                wave += level * (-timbre.decay * fade * t).exp() * phase.sin();
             }
             *slot += note.level * attack * release * wave;
         }
     }
+    if timbre.rain > 0.0 {
+        add_rain(&mut mix, timbre.rain, tone);
+    }
     mix
+}
+
+/// Adds a soft bed of rain: noise through two gentle low-pass filters, so it hisses quietly
+/// rather than crackles, faded in and out over the whole tone. The noise is seeded by the event,
+/// so the same tone is always written the same way and the cache stays valid.
+fn add_rain(mix: &mut [f32], level: f32, tone: Tone) {
+    let mut rng = Rng::new(0x7a1d_0000 + tone as u64);
+    let count = mix.len();
+    let fade_in = samples(0.04).max(1) as f32;
+    let fade_out = samples(0.15).max(1) as f32;
+    let (mut low, mut lower) = (0.0_f32, 0.0_f32);
+    for (i, slot) in mix.iter_mut().enumerate() {
+        let white = rng.unit() * 2.0 - 1.0;
+        low += 0.12 * (white - low);
+        lower += 0.12 * (low - lower);
+        let from_end = (count - 1 - i) as f32;
+        let fade = (i as f32 / fade_in).min(from_end / fade_out).min(1.0);
+        // the filters take the noise down to about a tenth of its level, so it is scaled back up
+        *slot += level * 8.0 * lower * fade;
+    }
 }
 
 /// The root mean square of the loudest stretch of samples.
@@ -775,8 +856,8 @@ mod tests {
     }
 
     #[test]
-    fn there_are_six_sets_each_with_every_event() {
-        assert_eq!(SoundSet::ALL.len(), 6);
+    fn there_are_eight_sets_each_with_every_event() {
+        assert_eq!(SoundSet::ALL.len(), 8);
         for set in SoundSet::ALL {
             assert_eq!(SoundSet::parse(set.name()), Some(set));
             for tone in Tone::ALL {
@@ -789,7 +870,8 @@ mod tests {
                 );
             }
         }
-        assert_eq!(SoundSet::Glass.next(), SoundSet::Bells);
+        assert_eq!(SoundSet::Glass.next(), SoundSet::Piano);
+        assert_eq!(SoundSet::Rain.next(), SoundSet::Bells);
         assert_eq!(Tone::parse("still-failing"), Some(Tone::StillFailing));
         assert!(!Tone::StillFailing.on_by_default());
     }

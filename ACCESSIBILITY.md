@@ -183,8 +183,8 @@ their own words. With `NO_COLOR` set, every character is drawn in the terminal's
 
 ## Sound
 
-The scenes make no sound. The watch mode can play six short events in one of six sound sets:
-`bells`, `marimba`, `kalimba`, `pad`, `chip` and `glass`.
+The scenes make no sound. The watch mode can play six short events in one of eight sound sets:
+`bells`, `marimba`, `kalimba`, `pad`, `chip`, `glass`, `piano` and `rain`.
 
 | Event | When | On by default |
 | --- | --- | --- |

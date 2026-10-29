@@ -16,8 +16,9 @@
 
 ## Self-help
 
-- [README.md](README.md) for the scenes, the install steps, the keys, the flags and how the theme is
-  picked
+- [README.md](README.md) for the gallery, the install steps and a quick start
+- [docs/usage.md](docs/usage.md) for the keys and the flags, [docs/watch-mode.md](docs/watch-mode.md)
+  for the watch mode and [docs/themes.md](docs/themes.md) for how the theme is picked
 - [docs/scenes.md](docs/scenes.md) for what each scene draws and what it does under reduced motion
 - [ACCESSIBILITY.md](ACCESSIBILITY.md) for the measured limits and the known gaps
 - `zacess-scenes --help` for the flags and `zacess-scenes --list-themes` to see which theme would be
