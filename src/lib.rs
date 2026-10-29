@@ -9,13 +9,17 @@ pub mod cli;
 pub mod colour;
 pub mod frame;
 pub mod glyphs;
+pub mod json;
 pub mod motion;
 pub mod palette;
+pub mod report;
 pub mod rng;
 pub mod scene;
 pub mod scenes;
+pub mod sound;
 pub mod terminal;
 pub mod theme;
+pub mod watch;
 
 /// The crate version, shown by `--version`.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

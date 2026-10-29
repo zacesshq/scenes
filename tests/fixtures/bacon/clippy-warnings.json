@@ -1,0 +1,825 @@
+{
+  "error_code": null,
+  "output": {
+    "lines": [
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Checking"
+            },
+            {
+              "csi": "",
+              "raw": " sample v0.1.0 (/work/sample)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "warning"
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": ": length comparison to zero"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "--> "
+            },
+            {
+              "csi": "",
+              "raw": "src/main.rs:3:20"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "3"
+            },
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            },
+            {
+              "csi": "",
+              "raw": "     println!(\"{}\", v.len() == 0);"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            },
+            {
+              "csi": "",
+              "raw": "                    "
+            },
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "^^^^^^^^^^^^"
+            },
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "help: using `is_empty` is clearer and more explicit: `v.is_empty()`"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "= "
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": "help"
+            },
+            {
+              "csi": "",
+              "raw": ": for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#len_zero"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "= "
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": "note"
+            },
+            {
+              "csi": "",
+              "raw": ": `#[warn(clippy::len_zero)]` on by default"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "warning"
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": ": useless use of `vec!`"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "--> "
+            },
+            {
+              "csi": "",
+              "raw": "src/main.rs:2:13"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "2"
+            },
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            },
+            {
+              "csi": "",
+              "raw": "     let v = vec![1, 2, 3];"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            },
+            {
+              "csi": "",
+              "raw": "             "
+            },
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "^^^^^^^^^^^^^"
+            },
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "help: you can use an array directly: `[1, 2, 3]`"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "= "
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": "help"
+            },
+            {
+              "csi": "",
+              "raw": ": for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#useless_vec"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "= "
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": "note"
+            },
+            {
+              "csi": "",
+              "raw": ": `#[warn(clippy::useless_vec)]` on by default"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "warning"
+            },
+            {
+              "csi": "",
+              "raw": ": `sample` (bin \"sample\") generated 2 warnings (run `cargo clippy --fix --bin \"sample\" -p sample -- ` to apply 2 suggestions)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Finished"
+            },
+            {
+              "csi": "",
+              "raw": " `dev` profile [unoptimized + debuginfo] target(s) in 0.10s"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "lines": [
+    {
+      "item_idx": 1,
+      "line_type": {
+        "Title": "Warning"
+      },
+      "content": {
+        "strings": [
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "warning"
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": ": length comparison to zero"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Location",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "--> "
+          },
+          {
+            "csi": "",
+            "raw": "src/main.rs:3:20"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "3"
+          },
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          },
+          {
+            "csi": "",
+            "raw": "     println!(\"{}\", v.len() == 0);"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          },
+          {
+            "csi": "",
+            "raw": "                    "
+          },
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "^^^^^^^^^^^^"
+          },
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "help: using `is_empty` is clearer and more explicit: `v.is_empty()`"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "= "
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": "help"
+          },
+          {
+            "csi": "",
+            "raw": ": for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#len_zero"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "= "
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": "note"
+          },
+          {
+            "csi": "",
+            "raw": ": `#[warn(clippy::len_zero)]` on by default"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": []
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": {
+        "Title": "Warning"
+      },
+      "content": {
+        "strings": [
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "warning"
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": ": useless use of `vec!`"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": "Location",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "--> "
+          },
+          {
+            "csi": "",
+            "raw": "src/main.rs:2:13"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "2"
+          },
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          },
+          {
+            "csi": "",
+            "raw": "     let v = vec![1, 2, 3];"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          },
+          {
+            "csi": "",
+            "raw": "             "
+          },
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "^^^^^^^^^^^^^"
+          },
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "help: you can use an array directly: `[1, 2, 3]`"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "= "
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": "help"
+          },
+          {
+            "csi": "",
+            "raw": ": for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#useless_vec"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 2,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "= "
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": "note"
+          },
+          {
+            "csi": "",
+            "raw": ": `#[warn(clippy::useless_vec)]` on by default"
+          }
+        ]
+      }
+    }
+  ],
+  "stats": {
+    "warnings": 2,
+    "errors": 0,
+    "test_fails": 0,
+    "location_lines": 2,
+    "normal_lines": 13
+  },
+  "suggest_backtrace": false,
+  "failure_keys": [],
+  "analyzer_exports": {},
+  "has_passed_tests": false,
+  "dismissed_items": 0,
+  "dismissed_lines": []
+}

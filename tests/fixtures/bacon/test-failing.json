@@ -1,0 +1,424 @@
+{
+  "error_code": 101,
+  "output": {
+    "lines": [
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "   Compiling"
+            },
+            {
+              "csi": "",
+              "raw": " sample v0.1.0 (/work/sample)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Finished"
+            },
+            {
+              "csi": "",
+              "raw": " `test` profile [unoptimized + debuginfo] target(s) in 0.11s"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "     Running"
+            },
+            {
+              "csi": "",
+              "raw": " unittests src/main.rs (target/debug/deps/sample-fc0dd4873e9cb750)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "running 2 tests"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "test tests::it_works ... ok"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "test tests::adds_up ... FAILED"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "failures:"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "---- tests::adds_up stdout ----"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "thread 'tests::adds_up' (3981679) panicked at src/main.rs:9:9:"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "assertion `left == right` failed"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  left: 4"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": " right: 5"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "failures:"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "    tests::adds_up"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[91m",
+              "raw": "error"
+            },
+            {
+              "csi": "",
+              "raw": ": test failed, to rerun pass `--bin sample`"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "lines": [
+    {
+      "item_idx": 1,
+      "line_type": {
+        "Title": "TestOutput"
+      },
+      "content": {
+        "strings": [
+          {
+            "csi": "\u001b[1m\u001b[38;5;208m",
+            "raw": "failed"
+          },
+          {
+            "csi": "",
+            "raw": ": "
+          },
+          {
+            "csi": "",
+            "raw": "tests::"
+          },
+          {
+            "csi": "\u001b[1m\u001b[38;5;208m",
+            "raw": "adds_up"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Location",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "thread 'tests::adds_up' (3981679) panicked at src/main.rs:9:9:"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "assertion `left == right` failed"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  left: 4"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": " right: 5"
+          }
+        ]
+      }
+    }
+  ],
+  "stats": {
+    "warnings": 0,
+    "errors": 0,
+    "test_fails": 1,
+    "location_lines": 1,
+    "normal_lines": 3
+  },
+  "suggest_backtrace": true,
+  "failure_keys": [
+    "tests::adds_up"
+  ],
+  "analyzer_exports": {},
+  "has_passed_tests": true,
+  "dismissed_items": 0,
+  "dismissed_lines": []
+}

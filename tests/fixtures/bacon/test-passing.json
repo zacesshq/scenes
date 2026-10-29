@@ -1,0 +1,144 @@
+{
+  "error_code": null,
+  "output": {
+    "lines": [
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "   Compiling"
+            },
+            {
+              "csi": "",
+              "raw": " sample v0.1.0 (/work/sample)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Finished"
+            },
+            {
+              "csi": "",
+              "raw": " `test` profile [unoptimized + debuginfo] target(s) in 0.08s"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "     Running"
+            },
+            {
+              "csi": "",
+              "raw": " unittests src/main.rs (target/debug/deps/sample-fc0dd4873e9cb750)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "running 1 test"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "test tests::it_works ... ok"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdOut"
+        },
+        "content": {
+          "strings": []
+        }
+      }
+    ]
+  },
+  "lines": [],
+  "stats": {
+    "warnings": 0,
+    "errors": 0,
+    "test_fails": 0,
+    "location_lines": 0,
+    "normal_lines": 0
+  },
+  "suggest_backtrace": false,
+  "failure_keys": [],
+  "analyzer_exports": {},
+  "has_passed_tests": true,
+  "dismissed_items": 0,
+  "dismissed_lines": []
+}

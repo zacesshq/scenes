@@ -15,6 +15,9 @@ its code and its tests, not what it aims to do.
   key repeats are ignored, so holding `Space` never makes the line flash.
 - The mouse is not used and nothing needs a modifier key apart from `Ctrl+C`, which the terminal
   passes on as a key.
+- The watch mode adds `1` to `4` to switch the job, `r` to run it again, `p` to pause the animation
+  and `s` to turn sound on or off. Its key hint shows, dims and goes in the same way as the help
+  line, above a status bar that stays on screen.
 
 ## Before and after the scene
 
@@ -28,6 +31,10 @@ its code and its tests, not what it aims to do.
   as it was. A `SIGKILL` cannot be caught by any program; after one, `reset` gives the terminal
   back. On Windows, closing the console window ends the console along with the program.
 - `--duration <minutes>` stops the scene on its own, for a screen that should not run forever.
+- The watch mode prints the same kind of line before it starts: the project, the job, the theme,
+  whether reduced motion is on and every key. Without bacon or outside a Cargo project it prints
+  a plain message instead and never takes over the screen. Without bacon the message gives the
+  command that installs it.
 
 ## Motion
 
@@ -65,6 +72,9 @@ hold them:
 | waves | A gull's wings, through four positions | One beat takes 1.6 seconds, 3.2 under reduced motion | `the_sea_fills_below_the_horizon_and_gulls_fly_above_it` |
 | code-rain | A cell of a column's trail, as the column moves down | At most three times a second under reduced motion | `calm_trails_change_a_cell_at_most_three_times_a_second` |
 | every scene | The help line | Fades in two steps, over 5.5 seconds, never blinks | `the_overlay_shows_then_dims_then_goes` |
+| watch mode storm | A bolt of lightning, as in the rain | Once every 5 seconds since the last, the first one 5 seconds after the storm appears, never under reduced motion | `the_storm_keeps_the_lightning_limits` |
+| watch mode | The change between passing and failing: the scene, the banner and the list | Once per finished run of the job, in one step with no fade, flash or inverted frame. A run takes as long as the build, so seconds apart at the least | `the_state_moves_from_waiting_to_passing_to_failing_and_back` |
+| watch mode | The key hint | Fades in two steps, over 5.5 seconds, never blinks | `the_hint_shows_then_dims_then_goes` |
 
 Things that move, such as drops, fish, flakes and fireflies, change the cells they pass through as
 they go. Counted cell by cell over 30 seconds at 20 by 8, 80 by 24 and 120 by 40, the most changes
@@ -93,15 +103,42 @@ motion every one of them moves at half speed.
 - Where two colours touch inside one shape, the Zacess mark's band and its page or tile, a row of
   background keeps them apart, so the band never depends on the contrast between the two colours.
   `the_band_never_touches_a_cell_of_another_colour` checks it in every theme.
+- The watch mode's banner, list and status bar use the theme's green for passing and its error
+  and warning colours for problems. Where the error or warning colour is below the theme's floor
+  its red or yellow stands in. `every_overlay_colour_keeps_the_floor_in_every_theme` draws every
+  state in all eight themes and checks every colour. It also checks that the error colour differs
+  from both the warning and the passing colours.
 - Colour is never the only signal. Fish of different kinds are different shapes, flame layers use
   different shade characters, a star's brightness is a different character and the settled snow is
-  a solid block. With `NO_COLOR` set, every character is drawn in the terminal's own text colour and
+  a solid block. In the watch mode passing reads `✓ passing` with ALL GOOD, failing reads
+`✗ failing` with BUILD FAILED, errors are marked with a cross and warnings with `!` as well as
+their own words. With `NO_COLOR` set, every character is drawn in the terminal's own text colour and
   every scene stays readable.
 - The program sets no background colour of its own. It assumes the terminal is already on the same
   Zacess theme. On a terminal with a different background the measured ratios do not apply.
 - On a light theme the snow bank is drawn in the theme's grey rather than solid black and the
   Zacess mark is drawn as its dark tile with the page left as the background, so it keeps the look
   of the real mark.
+
+## Sound
+
+The scenes make no sound. The watch mode can play three short tones: a gentle rising chime when a
+run passes, a lower two-note tone when it fails and a soft tick when a rebuild starts.
+
+- Sound is never the only signal. Every tone has the same state on screen at the same moment: the
+  banner, the scene and the status bar show passing or failing and the status bar shows `running`
+  while a rebuild runs.
+- The pass and fail tones play once when the result changes or when a key asked for the run, not on
+  every save, so a build that keeps failing stays quiet.
+- Sound is turned off with `--no-sound`, with `ZACESS_SOUND=0` (or `false`, `no` or `off`) or with
+  `s` while it runs. The status bar then says `sound off`. The volume is set from 0 to 100 with
+  `--volume` or `ZACESS_VOLUME`, 50 by default. A volume of 0 is silent.
+- The tones are synthesised by the program with soft envelopes and short fades at both ends, so they
+  never click. The loudest sample sits at 70 percent of full scale at volume 100 and never clips.
+  `no_sample_reaches_full_scale_at_any_volume` and
+  `tones_start_and_end_in_silence_so_they_never_click` hold this.
+- The longest tone, the pass chime, lasts just over a second.
+- Without a system player the watch mode stays silent and the status bar says `no sound player`.
 
 ## Size
 
@@ -129,7 +166,10 @@ whale, the moon and the sun, are left out on a terminal too small for them rathe
   so the picture never drifts or wraps.
 - The alternate screen is not read by screen readers. What a screen reader user gets is the plain
   line before the scene and the line after it.
-- There is no sound and no haptic feedback.
+- The scenes make no sound and nothing gives haptic feedback. The watch mode's tones are described
+  under [Sound](#sound).
+- The watch mode's status changes happen on the alternate screen, so a screen reader does not hear
+  them. Its tones are the only change heard without looking.
 - The system reduced motion setting is read on macOS, GNOME and Windows (both the Animation
   effects switch in Settings and the minimise animation in the performance options). Another
   desktop needs the flag or the environment variable. A settings command that takes longer than

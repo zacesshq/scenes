@@ -89,6 +89,9 @@ floor for a stronger palette colour. The shared checks fail on any colour that s
   itself; it is given time, a size, a random number generator and a theme.
 - **No heavy dependencies.** crossterm is the only runtime dependency, plus signal-hook on Unix,
   which crossterm already uses. Reading a system setting uses the command the system already has.
+  The watch mode follows the same rule: bacon runs as a separate program, its report is read by
+  the small JSON reader in `src/json.rs` and its tones are synthesised in `src/sound.rs` and
+  played by the system's own player.
 
 ## Releasing
 
