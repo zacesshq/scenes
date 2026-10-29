@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
 ### Added
 
 - `zacess-scenes watch [job]`, a build monitor for Rust projects. It runs bacon headless with its JSON report export turned on through `--config-toml`, so the project's own `bacon.toml` is never written to. Each report is read with a small JSON reader of our own. The jobs are `check` (the default), `check-all`, `clippy` and `test`.
@@ -42,5 +44,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The README, this changelog, the accessibility statement, the contributing guide, the security policy, the support guide, the code of conduct, a licensing notice for the Zacess mark and the palette, issue forms for a bug, a scene idea and an accessibility problem, a pull request template, CODEOWNERS and Dependabot for the actions and the Cargo dependencies.
 - `docs/scenes.md`, which describes every scene and its reduced motion behaviour.
 
-[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/zacesshq/scenes/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/zacesshq/scenes/releases/tag/v0.1.0
