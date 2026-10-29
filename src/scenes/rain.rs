@@ -1,5 +1,6 @@
 //! Rain: drops at two depths, ripples where they land and, unless motion is reduced, a distant
-//! flash of lightning every few seconds at most.
+//! flash of lightning every few seconds at most. The storm variant, shown by the watch mode when
+//! a build fails, has twice the rain, a wind and a heavier sky, with the same lightning limits.
 
 use super::{count_for, wrap};
 use crate::frame::Frame;
@@ -47,6 +48,8 @@ pub struct Rain {
     /// gap, whatever else resets, so a resize can never bring a bolt early.
     since_strike: f32,
     flashes: u32,
+    /// The storm variant.
+    storm: bool,
 }
 
 impl Rain {
@@ -63,9 +66,30 @@ impl Rain {
             next_bolt: rng.range(MIN_LIGHTNING_GAP, 14.0),
             since_strike: 0.0,
             flashes: 0,
+            storm: false,
         };
         rain.resize(width, height, rng);
         rain
+    }
+
+    /// The storm variant. Its first bolt still waits the minimum gap from the moment it is
+    /// built, so a change to the storm never opens with a flash.
+    pub fn storm(width: usize, height: usize, motion: Motion, rng: &mut Rng) -> Self {
+        let mut rain = Self::new(1, 1, motion, rng);
+        rain.storm = true;
+        rain.resize(width, height, rng);
+        rain
+    }
+
+    /// Columns a second the wind carries the rain sideways.
+    fn wind(&self) -> f32 {
+        if self.storm { 4.0 } else { 1.0 }
+    }
+
+    /// The longest wait for the next bolt. A storm strikes more often, never more often than
+    /// the minimum gap allows.
+    fn longest_wait(&self) -> f32 {
+        if self.storm { 9.0 } else { 15.0 }
     }
 
     fn new_drop(&self, rng: &mut Rng, from_top: bool) -> Drop {
@@ -130,7 +154,11 @@ impl Scene for Rain {
     fn resize(&mut self, width: usize, height: usize, rng: &mut Rng) {
         self.width = width.max(1);
         self.height = height.max(1);
-        let wanted = count_for(self.width, self.height, 10, 6, 400);
+        let wanted = if self.storm {
+            count_for(self.width, self.height, 5, 12, 800)
+        } else {
+            count_for(self.width, self.height, 10, 6, 400)
+        };
         self.drops = (0..wanted).map(|_| self.new_drop(rng, false)).collect();
         self.ripples.clear();
         if self.bolt.take().is_some() {
@@ -151,6 +179,7 @@ impl Scene for Rain {
         let speed = self.motion.speed();
         let width = self.width as f32;
         let ground = self.ground();
+        let wind = self.wind();
 
         for cloud in &mut self.clouds {
             cloud.0 = wrap(cloud.0 + 0.4 * speed * dt + 12.0, width + 24.0) - 12.0;
@@ -159,7 +188,7 @@ impl Scene for Rain {
         for i in 0..self.drops.len() {
             let drop = &mut self.drops[i];
             drop.y += drop.speed * dt;
-            drop.x = wrap(drop.x + 1.0 * speed * dt, width);
+            drop.x = wrap(drop.x + wind * speed * dt, width);
             if drop.y >= ground as f32 {
                 let x = drop.x.round() as i32;
                 let near = drop.near;
@@ -183,7 +212,7 @@ impl Scene for Rain {
             bolt.age += dt;
             if bolt.age >= FLASH_LENGTH {
                 self.bolt = None;
-                self.next_bolt = rng.range(MIN_LIGHTNING_GAP, 15.0);
+                self.next_bolt = rng.range(MIN_LIGHTNING_GAP, self.longest_wait());
             }
         } else {
             self.next_bolt -= dt;
@@ -210,15 +239,26 @@ impl Scene for Rain {
             }
             frame.fill_row(ground, '_', Some(theme.muted));
         }
+        // the storm's sky is a second, offset row of cloud, kept clear of a tiny screen's ground
+        if self.storm && ground >= 3 {
+            for &(x, len) in &self.clouds {
+                for i in 0..len as i32 + 2 {
+                    frame.put(x.round() as i32 + i - 3, 1, '~', Some(theme.grey()));
+                }
+            }
+        }
 
+        let top = if self.storm && ground >= 3 { 2 } else { 1 };
         for drop in &self.drops {
-            let (ch, colour) = if drop.near {
+            let (ch, colour) = if self.storm && drop.near {
+                ('/', theme.bright_blue())
+            } else if drop.near {
                 ('|', theme.bright_blue())
             } else {
                 (':', theme.blue())
             };
             let y = drop.y.floor() as i32;
-            if y >= 1 || ground == 0 {
+            if y >= top || ground == 0 {
                 frame.put(drop.x.round() as i32, y.min(ground - 1), ch, Some(colour));
             }
         }
@@ -328,6 +368,74 @@ mod tests {
         assert!(!starts.is_empty());
         for pair in starts.windows(2) {
             assert!(pair[1] - pair[0] >= MIN_LIGHTNING_GAP - 0.01, "{pair:?}");
+        }
+    }
+
+    fn bolt_starts(rain: &mut Rain, rng: &mut Rng, seconds: usize) -> Vec<f32> {
+        let mut t = 0.0_f32;
+        let mut starts = Vec::new();
+        let mut was_flashing = false;
+        for _ in 0..(seconds * 20) {
+            rain.step(0.05, rng);
+            t += 0.05;
+            if rain.flashing() && !was_flashing {
+                starts.push(t);
+            }
+            was_flashing = rain.flashing();
+        }
+        starts
+    }
+
+    #[test]
+    fn the_storm_keeps_the_lightning_limits() {
+        let mut rng = Rng::new(3);
+        let mut storm = Rain::storm(80, 24, Motion::FULL, &mut rng);
+        let starts = bolt_starts(&mut storm, &mut rng, 300);
+        assert!(starts.len() >= 20, "only {} flashes", starts.len());
+        // the first bolt waits the full gap, so the change to a storm never opens with a flash
+        assert!(starts[0] >= MIN_LIGHTNING_GAP - 0.01, "{}", starts[0]);
+        for pair in starts.windows(2) {
+            assert!(pair[1] - pair[0] >= MIN_LIGHTNING_GAP - 0.01, "{pair:?}");
+        }
+        let mut calm = Rain::storm(80, 24, Motion::CALM, &mut rng);
+        assert!(bolt_starts(&mut calm, &mut rng, 300).is_empty());
+        assert_eq!(calm.flashes(), 0);
+    }
+
+    #[test]
+    fn the_storm_is_heavier_than_the_rain() {
+        let mut rng = Rng::new(8);
+        let mut rain = Rain::new(60, 20, Motion::FULL, &mut rng);
+        let mut storm = Rain::storm(60, 20, Motion::FULL, &mut rng);
+        assert_eq!(storm.drops.len(), 2 * rain.drops.len());
+        let rain_frame = render(&mut rain, 60, 20, 40);
+        let storm_frame = render(&mut storm, 60, 20, 40);
+        assert!(storm_frame.row_text(1).contains('~'));
+        assert!(storm_frame.to_text().contains('/'));
+        assert!(!rain_frame.to_text().contains('/'));
+        assert_eq!(storm.name(), "rain");
+    }
+
+    #[test]
+    fn the_storm_keeps_the_contrast_floor_at_every_size() {
+        use crate::theme;
+        for (width, height) in [(1, 1), (20, 8), (80, 24), (120, 40)] {
+            let mut rng = Rng::new(5);
+            let mut storm = Rain::storm(width, height, Motion::FULL, &mut rng);
+            let mut frame = Frame::new(width, height);
+            for step in 0..(60 * 20) {
+                storm.step(0.05, &mut rng);
+                if step % 10 != 0 {
+                    continue;
+                }
+                for theme in theme::all() {
+                    frame.clear();
+                    storm.draw(&mut frame, theme);
+                    for colour in frame.colours() {
+                        assert!(theme.contrast_of(colour) >= theme.floor(), "{}", theme.name);
+                    }
+                }
+            }
         }
     }
 

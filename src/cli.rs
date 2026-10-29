@@ -1,8 +1,10 @@
-//! The command line: a scene name and a handful of flags, parsed by hand so the binary stays
-//! small.
+//! The command line: a scene name and a handful of flags or `watch` and its job. It is parsed by
+//! hand so the binary stays small.
 
 use crate::colour::ColourDepth;
 use crate::scenes::SCENES;
+use crate::sound;
+use crate::watch::JOBS;
 
 pub const DEFAULT_SCENE: &str = "sea";
 pub const DEFAULT_FPS: u32 = 20;
@@ -20,6 +22,37 @@ pub enum Command {
     Version,
     ListScenes,
     ListThemes,
+    Watch(WatchOptions),
+    WatchHelp,
+}
+
+/// The settings for the watch mode.
+#[derive(Clone, Debug, PartialEq)]
+pub struct WatchOptions {
+    /// The bacon job: `check`, `check-all`, `clippy` or `test`.
+    pub job: String,
+    pub theme: Option<String>,
+    pub fps: u32,
+    pub reduced_motion: bool,
+    pub colour_depth: Option<ColourDepth>,
+    /// Set by `--no-sound`.
+    pub no_sound: bool,
+    /// Set by `--volume`, from 0 to 100.
+    pub volume: Option<u8>,
+}
+
+impl Default for WatchOptions {
+    fn default() -> Self {
+        Self {
+            job: JOBS[0].to_string(),
+            theme: None,
+            fps: DEFAULT_FPS,
+            reduced_motion: false,
+            colour_depth: None,
+            no_sound: false,
+            volume: None,
+        }
+    }
 }
 
 /// The settings for a run.
@@ -68,7 +101,8 @@ pub fn usage() -> String {
         text.push_str(&format!("  {:<11} {}\n", scene.name, scene.summary));
     }
     text.push_str(&format!(
-        "\nThe default scene is {DEFAULT_SCENE}.\n\nOptions:\n\
+        "\nThe default scene is {DEFAULT_SCENE}. Run zacess-scenes watch --help for the watch mode,\n\
+which shows the state of a Rust build as a scene.\n\nOptions:\n\
   --theme <name>       A Zacess theme by name, id or short name\n\
   --list-themes        Print the themes and which one is active\n\
   --list-scenes        Print the scenes\n\
@@ -120,11 +154,108 @@ fn parse_size(text: &str) -> Result<(usize, usize), String> {
     Ok((width, height))
 }
 
+/// The help text for the watch mode.
+pub fn watch_usage() -> String {
+    format!(
+        "Usage: zacess-scenes watch [job] [options]\n\n\
+Runs bacon in the current Cargo project and shows the state of the build as a scene: a calm sea\n\
+and ALL GOOD while it passes, a storm and BUILD FAILED with the first errors while it fails.\n\n\
+Jobs: {jobs} (default {default}).\n\n\
+Options:\n\
+  --theme <name>       A Zacess theme by name, id or short name\n\
+  --fps <n>            Frames per second, 1 to {MAX_FPS} (default {DEFAULT_FPS})\n\
+  --reduced-motion     Fewer and slower movements and no lightning\n\
+  --colour <depth>     truecolor or 256, when the terminal's colour depth is detected wrongly\n\
+  --no-sound           No tones (the screen shows every state either way)\n\
+  --volume <0-100>     The volume of the tones (default {volume})\n\
+  -h, --help           This help\n\
+\nKeys: q quits, 1 to 4 switch to {jobs}, r reruns the job, p or Space\n\
+pauses the animation, s turns sound on or off and h shows the keys again.\n\
+\nZACESS_SOUND=0 turns sound off and ZACESS_VOLUME sets the volume. Needs bacon, installed with\n\
+cargo install --locked bacon\n",
+        jobs = JOBS.join(", "),
+        default = JOBS[0],
+        volume = sound::DEFAULT_VOLUME,
+    )
+}
+
+fn parse_fps(text: &str) -> Result<u32, String> {
+    let fps: u32 = text
+        .parse()
+        .map_err(|_| format!("--fps wants a whole number, not \"{text}\""))?;
+    if !(1..=MAX_FPS).contains(&fps) {
+        return Err(format!("--fps must be between 1 and {MAX_FPS}, not {fps}"));
+    }
+    Ok(fps)
+}
+
+fn parse_colour(flag: &str, text: &str) -> Result<ColourDepth, String> {
+    ColourDepth::parse(text).ok_or_else(|| format!("{flag} wants truecolor or 256, not \"{text}\""))
+}
+
+/// Parses the arguments after `watch`.
+fn parse_watch(args: impl Iterator<Item = String>) -> Result<Command, String> {
+    let mut options = WatchOptions::default();
+    let mut job: Option<String> = None;
+    let mut args = args;
+    while let Some(arg) = args.next() {
+        let (flag, inline) = match arg.split_once('=') {
+            Some((flag, inline)) if flag.starts_with("--") => (flag.to_string(), Some(inline)),
+            _ => (arg.clone(), None),
+        };
+        match flag.as_str() {
+            "-h" | "--help" => return Ok(Command::WatchHelp),
+            "--reduced-motion" => options.reduced_motion = true,
+            "--no-sound" => options.no_sound = true,
+            "--theme" => options.theme = Some(value(&flag, inline, &mut args)?),
+            "--fps" => options.fps = parse_fps(&value(&flag, inline, &mut args)?)?,
+            "--colour" | "--color" => {
+                options.colour_depth =
+                    Some(parse_colour(&flag, &value(&flag, inline, &mut args)?)?);
+            }
+            "--volume" => {
+                let text = value(&flag, inline, &mut args)?;
+                options.volume = Some(sound::parse_volume(&text).ok_or_else(|| {
+                    format!("--volume wants a whole number from 0 to 100, not \"{text}\"")
+                })?);
+            }
+            _ if flag.starts_with('-') => {
+                return Err(format!(
+                    "unknown option {flag}. Run zacess-scenes watch --help for the options."
+                ));
+            }
+            _ => {
+                if job.is_some() {
+                    return Err(format!(
+                        "only one job can run at a time; \"{arg}\" is a second one"
+                    ));
+                }
+                let name = arg.trim().to_ascii_lowercase().replace('_', "-");
+                if !JOBS.contains(&name.as_str()) {
+                    return Err(format!(
+                        "\"{name}\" is not a job the watch mode runs. Use one of {}.",
+                        JOBS.join(", ")
+                    ));
+                }
+                job = Some(name);
+            }
+        }
+    }
+    if let Some(job) = job {
+        options.job = job;
+    }
+    Ok(Command::Watch(options))
+}
+
 /// Parses the arguments after the program name.
 pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, String> {
     let mut options = Options::default();
     let mut scene: Option<String> = None;
-    let mut args = args.into_iter();
+    let mut args = args.into_iter().peekable();
+    if args.peek().is_some_and(|first| first == "watch") {
+        args.next();
+        return parse_watch(args);
+    }
     while let Some(arg) = args.next() {
         let (flag, inline) = match arg.split_once('=') {
             Some((flag, inline)) if flag.starts_with("--") => (flag.to_string(), Some(inline)),
@@ -139,16 +270,7 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, String>
             "--reduced-motion" => options.reduced_motion = true,
             "--headless" => options.headless = true,
             "--theme" => options.theme = Some(value(&flag, inline, &mut args)?),
-            "--fps" => {
-                let text = value(&flag, inline, &mut args)?;
-                let fps: u32 = text
-                    .parse()
-                    .map_err(|_| format!("--fps wants a whole number, not \"{text}\""))?;
-                if !(1..=MAX_FPS).contains(&fps) {
-                    return Err(format!("--fps must be between 1 and {MAX_FPS}, not {fps}"));
-                }
-                options.fps = fps;
-            }
+            "--fps" => options.fps = parse_fps(&value(&flag, inline, &mut args)?)?,
             "--duration" => {
                 let text = value(&flag, inline, &mut args)?;
                 let minutes: f64 = text
@@ -179,11 +301,8 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, String>
                 options.frames = frames;
             }
             "--colour" | "--color" => {
-                let text = value(&flag, inline, &mut args)?;
-                options.colour_depth = Some(
-                    ColourDepth::parse(&text)
-                        .ok_or_else(|| format!("{flag} wants truecolor or 256, not \"{text}\""))?,
-                );
+                options.colour_depth =
+                    Some(parse_colour(&flag, &value(&flag, inline, &mut args)?)?);
             }
             "--size" => options.size = Some(parse_size(&value(&flag, inline, &mut args)?)?),
             _ if flag.starts_with('-') => {
@@ -345,6 +464,107 @@ mod tests {
                 .unwrap_err()
                 .contains("one scene")
         );
+    }
+
+    fn watch(args: &[&str]) -> WatchOptions {
+        let mut all = vec!["watch"];
+        all.extend_from_slice(args);
+        match parse_args(&all) {
+            Ok(Command::Watch(options)) => options,
+            other => panic!("expected a watch, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn watch_defaults_to_the_check_job_with_sound() {
+        let options = watch(&[]);
+        assert_eq!(options, WatchOptions::default());
+        assert_eq!(options.job, "check");
+        assert!(!options.no_sound);
+        assert_eq!(options.volume, None);
+    }
+
+    #[test]
+    fn watch_takes_a_job_and_its_flags() {
+        for job in JOBS {
+            assert_eq!(watch(&[job]).job, job);
+        }
+        assert_eq!(watch(&["Check_All"]).job, "check-all");
+        let options = watch(&[
+            "clippy",
+            "--no-sound",
+            "--volume=30",
+            "--theme",
+            "cream",
+            "--fps",
+            "10",
+            "--reduced-motion",
+            "--colour",
+            "256",
+        ]);
+        assert_eq!(options.job, "clippy");
+        assert!(options.no_sound && options.reduced_motion);
+        assert_eq!(options.volume, Some(30));
+        assert_eq!(options.theme.as_deref(), Some("cream"));
+        assert_eq!(options.fps, 10);
+        assert_eq!(options.colour_depth, Some(ColourDepth::Ansi256));
+        assert_eq!(watch(&["--volume", "0"]).volume, Some(0));
+        assert_eq!(parse_args(&["watch", "--help"]), Ok(Command::WatchHelp));
+    }
+
+    #[test]
+    fn watch_rejects_bad_jobs_and_values() {
+        assert!(
+            parse_args(&["watch", "doc"])
+                .unwrap_err()
+                .contains("check-all")
+        );
+        assert!(
+            parse_args(&["watch", "check", "test"])
+                .unwrap_err()
+                .contains("one job")
+        );
+        for bad in ["101", "-1", "loud"] {
+            assert!(
+                parse_args(&["watch", "--volume", bad])
+                    .unwrap_err()
+                    .contains("--volume")
+            );
+        }
+        assert!(
+            parse_args(&["watch", "--volume"])
+                .unwrap_err()
+                .contains("--volume")
+        );
+        assert!(
+            parse_args(&["watch", "--slow"])
+                .unwrap_err()
+                .contains("--slow")
+        );
+        // a scene flag before the word makes it a scene name, which is not one
+        assert!(
+            parse_args(&["--slow", "watch"])
+                .unwrap_err()
+                .contains("--list-scenes")
+        );
+    }
+
+    #[test]
+    fn the_watch_help_names_every_job_key_and_variable() {
+        let text = watch_usage();
+        for job in JOBS {
+            assert!(text.contains(job), "{job}");
+        }
+        for needle in [
+            "--no-sound",
+            "--volume",
+            "ZACESS_SOUND",
+            "ZACESS_VOLUME",
+            "cargo install --locked bacon",
+        ] {
+            assert!(text.contains(needle), "{needle}");
+        }
+        assert!(usage().contains("watch"));
     }
 
     #[test]

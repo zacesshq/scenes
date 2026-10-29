@@ -24,6 +24,19 @@ The released binary is built from these crates, each linked in rather than bundl
 | crossterm | Raw mode, the alternate screen, colours and keys | MIT |
 | signal-hook (Unix only) | Restoring the terminal on a termination signal | MIT or Apache-2.0 |
 
+## bacon
+
+The watch mode runs [bacon](https://github.com/Canop/bacon) by Canop, which is licensed under the
+[GNU Affero General Public License 3.0](https://github.com/Canop/bacon/blob/main/LICENSE). bacon is
+a separate program that the person installs themselves with `cargo install --locked bacon`. It is
+not bundled with, linked into or copied into Zacess Scenes. Zacess Scenes starts it as its own
+process and reads the JSON report it writes to a temporary file.
+
+## Sounds
+
+The watch mode's tones are synthesised by the program's own code in `src/sound.rs` when they are
+first needed. No recorded audio is bundled.
+
 ## Methods
 
 The contrast ratios use the relative luminance and contrast formulas from

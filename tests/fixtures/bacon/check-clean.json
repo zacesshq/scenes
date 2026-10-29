@@ -1,0 +1,57 @@
+{
+  "error_code": null,
+  "output": {
+    "lines": [
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Checking"
+            },
+            {
+              "csi": "",
+              "raw": " sample v0.1.0 (/work/sample)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Finished"
+            },
+            {
+              "csi": "",
+              "raw": " `dev` profile [unoptimized + debuginfo] target(s) in 0.03s"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "lines": [],
+  "stats": {
+    "warnings": 0,
+    "errors": 0,
+    "test_fails": 0,
+    "location_lines": 0,
+    "normal_lines": 0
+  },
+  "suggest_backtrace": false,
+  "failure_keys": [],
+  "analyzer_exports": {},
+  "has_passed_tests": false,
+  "dismissed_items": 0,
+  "dismissed_lines": []
+}

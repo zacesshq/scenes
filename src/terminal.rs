@@ -37,6 +37,8 @@ pub enum Input {
     Quit,
     Pause,
     Help,
+    /// A key with a meaning only in one mode, such as the job keys of the watch mode.
+    Key(char),
     Resize(usize, usize),
 }
 
@@ -56,6 +58,19 @@ pub fn interpret(key: KeyEvent) -> Input {
         KeyCode::Char(' ') => Input::Pause,
         KeyCode::Char('h') | KeyCode::Char('H') | KeyCode::Char('?') => Input::Help,
         _ => Input::None,
+    }
+}
+
+/// Maps a key in the watch mode: `1` to `4`, `r`, `p` and `s` on top of the keys every mode has.
+pub fn interpret_watch(key: KeyEvent) -> Input {
+    if key.kind != KeyEventKind::Press || key.modifiers.contains(KeyModifiers::CONTROL) {
+        return interpret(key);
+    }
+    match key.code {
+        KeyCode::Char(c @ ('1'..='4' | 'r' | 'R' | 'p' | 'P' | 's' | 'S')) => {
+            Input::Key(c.to_ascii_lowercase())
+        }
+        _ => interpret(key),
     }
 }
 
@@ -119,6 +134,8 @@ pub struct Terminal {
     pending: Option<Input>,
     /// Set by a termination signal, so the run loop ends and the terminal is restored.
     stop: Arc<AtomicBool>,
+    /// How keys are read, which differs between the scenes and the watch mode.
+    keys: fn(KeyEvent) -> Input,
 }
 
 impl Terminal {
@@ -162,6 +179,7 @@ impl Terminal {
             mapped: HashMap::new(),
             pending: None,
             stop,
+            keys: interpret,
         })
     }
 
@@ -169,6 +187,11 @@ impl Terminal {
     pub fn set_paint(&mut self, paint: Paint) {
         self.paint = Some(paint);
         self.mapped.clear();
+    }
+
+    /// Sets how keys are read.
+    pub fn set_keys(&mut self, keys: fn(KeyEvent) -> Input) {
+        self.keys = keys;
     }
 
     /// The terminal size, with the fallback when it reports a zero.
@@ -275,13 +298,13 @@ impl Terminal {
             });
         }
         Ok(match event::read()? {
-            Event::Key(key) => interpret(key),
+            Event::Key(key) => (self.keys)(key),
             Event::Resize(..) => {
                 while event::poll(Duration::ZERO)? {
                     match event::read()? {
                         Event::Resize(..) => {}
                         Event::Key(key) => {
-                            self.pending = Some(interpret(key));
+                            self.pending = Some((self.keys)(key));
                             break;
                         }
                         _ => {}
@@ -349,6 +372,43 @@ mod tests {
         );
         assert_eq!(
             interpret(key(KeyCode::Char('x'), KeyModifiers::NONE)),
+            Input::None
+        );
+    }
+
+    #[test]
+    fn the_watch_keys_add_to_the_common_ones() {
+        for (c, wanted) in [
+            ('1', '1'),
+            ('4', '4'),
+            ('r', 'r'),
+            ('R', 'r'),
+            ('p', 'p'),
+            ('s', 's'),
+        ] {
+            assert_eq!(
+                interpret_watch(key(KeyCode::Char(c), KeyModifiers::NONE)),
+                Input::Key(wanted)
+            );
+        }
+        assert_eq!(
+            interpret_watch(key(KeyCode::Char('5'), KeyModifiers::NONE)),
+            Input::None
+        );
+        assert_eq!(
+            interpret_watch(key(KeyCode::Char('q'), KeyModifiers::NONE)),
+            Input::Quit
+        );
+        assert_eq!(
+            interpret_watch(key(KeyCode::Char('c'), KeyModifiers::CONTROL)),
+            Input::Quit
+        );
+        let repeat =
+            KeyEvent::new_with_kind(KeyCode::Char('r'), KeyModifiers::NONE, KeyEventKind::Repeat);
+        assert_eq!(interpret_watch(repeat), Input::None);
+        // the scenes keep their own keys only
+        assert_eq!(
+            interpret(key(KeyCode::Char('r'), KeyModifiers::NONE)),
             Input::None
         );
     }

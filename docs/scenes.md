@@ -55,6 +55,20 @@ whatever the random numbers say (`MIN_LIGHTNING_GAP`).
   bolts are at least five seconds over five simulated minutes, also with a new size on every frame;
   a tiny screen never gets one.
 
+### The storm
+
+The watch mode shows a storm while a build fails. It is the rain scene with twice the drops, a
+stronger wind that slants the near drops to `/` and a second, offset row of cloud below the first.
+Its bolts come every 5 to 9 seconds instead of 5 to 15, with the same five second minimum gap, and
+the first bolt waits five seconds from the moment the storm appears, so the change to a storm never
+opens with a flash. It cannot be picked on its own from the command line.
+
+- Colours: the same as the rain.
+- Reduced motion: no lightning at all and rain at half speed.
+- Tests: the gaps between bolts, the first bolt and no bolt under reduced motion over five
+  simulated minutes; twice the drops, the second row of cloud and the slanted drops; every colour
+  at four sizes in every theme.
+
 ## snow
 
 Flakes at two depths (`*` near, `.` far) drift down with a slow sideways sway and settle where
@@ -184,3 +198,32 @@ beneath the mark.
   colour the band row is wider than the page with blank rows beside it; the page sizes chosen for 20
   by 8 and 120 by 40, the page, band and fold drawn in both
   appearances and the mark moving while staying inside a 20 by 8 screen for a simulated minute.
+
+## The watch mode
+
+`zacess-scenes watch` draws one of two scenes behind its banner and status bar: the `waves` scene
+while waiting for the first result and while the build passes, the storm while it fails. The scene
+changes in one step when the result changes, with no fade, flash or inverted frame between the two,
+and a new scene starts from its own first frame.
+
+Over the scene sits a panel cleared to the background, so the scene never runs through the text:
+
+- the banner, five rows of `█` in the theme's green for ALL GOOD with a check mark or in its error
+  colour for BUILD FAILED with a cross. A terminal narrower than the banner or under 13 rows gets
+  a one line `✓ ALL GOOD` or `✗ BUILD FAILED` instead;
+- below it, while passing, a short caption that changes with each passing run and any warnings;
+  while failing, the errors and failing tests first and the warnings after them. Each problem is
+  its first line with its location indented beneath it. When they do not all fit, the last line
+  says how many more there are;
+- while waiting, a line saying which job bacon is running. If bacon stops on its own, its last line
+  and how to start it again.
+
+The key hint shows above the status bar for four seconds, then in the muted colour for one and a
+half seconds, then not at all, as the scenes' help line does.
+
+- Colours: the error and warning colours come from the theme. Where either is below the theme's
+  floor, its red or yellow stands in. Captions and text are in the text colour and locations, the
+  hint and the status bar's separators in the muted colour.
+- Tests: `every_overlay_colour_keeps_the_floor_in_every_theme` draws every state in all eight
+  themes and checks every colour. Other tests cover the status bar text at every width from 1 to
+  120 columns, the banner sizes, the order of errors and warnings and the count of the rest.

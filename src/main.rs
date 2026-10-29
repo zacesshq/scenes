@@ -7,7 +7,7 @@ use zacess_scenes::colour::ColourDepth;
 use zacess_scenes::rng::Rng;
 use zacess_scenes::scene::Motion;
 use zacess_scenes::terminal::{self, Terminal};
-use zacess_scenes::{VERSION, app, glyphs, motion, scenes, theme};
+use zacess_scenes::{VERSION, app, glyphs, motion, scenes, sound, theme, watch};
 
 fn main() -> ExitCode {
     match run() {
@@ -83,6 +83,8 @@ fn run() -> Result<(), String> {
             }
             return emit(&text);
         }
+        Command::WatchHelp => return emit(&cli::watch_usage()),
+        Command::Watch(options) => return run_watch(options),
         Command::Run(options) => options,
     };
 
@@ -148,4 +150,89 @@ fn run() -> Result<(), String> {
     let result = app::run(scene.as_mut(), theme, &settings, &mut rng, &mut terminal);
     drop(terminal);
     result.map_err(|error| format!("terminal error: {error}"))
+}
+
+/// The sound settings from the flags and the variables: `--no-sound` or `ZACESS_SOUND=0` turn it
+/// off and `--volume` beats `ZACESS_VOLUME`.
+fn sound_settings(options: &cli::WatchOptions) -> Result<(bool, u8), String> {
+    let env_sound = std::env::var(sound::SOUND_ENV).ok();
+    let enabled = !options.no_sound && !sound::env_turns_off(env_sound.as_deref());
+    let volume = match options.volume {
+        Some(volume) => volume,
+        None => match std::env::var(sound::VOLUME_ENV)
+            .ok()
+            .filter(|v| !v.trim().is_empty())
+        {
+            Some(text) => sound::parse_volume(&text).ok_or_else(|| {
+                format!(
+                    "{} is \"{text}\", which is not a whole number from 0 to 100.",
+                    sound::VOLUME_ENV
+                )
+            })?,
+            None => sound::DEFAULT_VOLUME,
+        },
+    };
+    Ok((enabled, volume))
+}
+
+fn run_watch(options: cli::WatchOptions) -> Result<(), String> {
+    let here = std::env::current_dir()
+        .map_err(|error| format!("could not read the current folder: {error}"))?;
+    let project_dir = watch::find_project(&here).ok_or_else(|| watch::not_a_project(&here))?;
+    let bacon = sound::find_program("bacon").ok_or_else(watch::bacon_missing)?;
+    let theme = pick_theme(options.theme.as_deref())?;
+    let (sound_on, volume) = sound_settings(&options)?;
+    let env_motion = std::env::var(motion::ENV_VAR).ok();
+    let calm = motion::reduced(options.reduced_motion, env_motion.as_deref(), || {
+        motion::system_reduced_motion()
+    });
+    let colour = !std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty());
+    let settings = app::Settings {
+        fps: options.fps,
+        speed: 1.0,
+        calm,
+        duration: None,
+        colour,
+    };
+    let project = watch::project_name(&project_dir);
+    let report_path = std::env::temp_dir()
+        .join(format!("zacess-scenes-watch-{}", std::process::id()))
+        .join("report.json");
+    let mut context = watch::Context {
+        theme,
+        settings,
+        bacon,
+        project_dir,
+        report_path: report_path.clone(),
+        sound: sound::Sound::new(sound_on, volume),
+    };
+    let mut state = watch::Watch::new(project.clone(), options.job.clone());
+    let mut rng = Rng::from_time();
+
+    let intro = format!(
+        "Zacess Scenes is watching {project} with bacon, running the {} job in {}{}. q quits, \
+         1 to 4 switch the job, r reruns, p pauses the animation and s turns sound on or off.",
+        options.job,
+        theme.name,
+        if calm { " with reduced motion" } else { "" }
+    );
+    let env = |name: &str| std::env::var(name).ok();
+    let depth = options
+        .colour_depth
+        .unwrap_or_else(|| ColourDepth::detect(env));
+    glyphs::set_basic(terminal::limited_font(env));
+    let mut terminal = Terminal::open(&intro)
+        .map_err(|error| format!("could not take over the terminal: {error}"))?;
+    terminal.set_paint(terminal::Paint {
+        depth,
+        background: theme.background,
+        floor: theme.floor(),
+    });
+    terminal.set_keys(terminal::interpret_watch);
+    let result = watch::run(&mut context, &mut state, &mut rng, &mut terminal);
+    drop(terminal);
+    if let Some(dir) = report_path.parent() {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    result.map_err(|error| format!("watch stopped: {error}"))
 }

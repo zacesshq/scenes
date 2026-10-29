@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- `zacess-scenes watch [job]`, a build monitor for Rust projects. It runs bacon headless with its JSON report export turned on through `--config-toml`, so the project's own `bacon.toml` is never written to. Each report is read with a small JSON reader of our own. The jobs are `check` (the default), `check-all`, `clippy` and `test`.
+- While the build passes, the `waves` scene with a large ALL GOOD banner, a check mark, a short caption and any warnings. While it fails, a storm with a large BUILD FAILED banner, a cross and the first errors or failing tests with their locations, followed by the warnings. Warnings are marked `!` in the theme's warning colour and errors a cross in its error colour.
+- A status bar in the active theme's colours, such as `project │ job │ ✓ passing · 2 warnings │ 12s ago`, with `✗ failing` in the theme's error colour, `running` while bacon runs the job and notes for a paused animation, sound turned off or no sound player. It fits every width from one column up.
+- Watch mode keys: `1` to `4` switch the job, `r` reruns it, `p` or `Space` pauses the animation, `s` turns sound on or off, `h` shows the keys again and `q` quits and stops bacon.
+- A clear message outside a Cargo project and another when bacon is missing, with the command `cargo install --locked bacon`.
+- Tones of our own, synthesised at run time with soft bell envelopes and short fades into WAV files in the user's cache folder: a gentle rising chime when a run passes, a lower two-note tone when it fails and a soft tick when a rebuild starts. They play in the background through `afplay`, `pw-play`, `paplay`, `aplay` or PowerShell, whichever the system has. A missing player only means no sound and a note in the status bar.
+- `--no-sound`, `--volume <0-100>` and the `ZACESS_SOUND` and `ZACESS_VOLUME` environment variables.
+- A storm variant of the rain scene with twice the drops, a wind and a second row of cloud. It keeps the five second gap between bolts, waits five seconds before its first and has no lightning under reduced motion.
+- Tests for the report reader against real bacon reports of a clean check, a warning, two errors, Clippy warnings and passing and failing tests, for the WAV header, length, level and fades and for the status bar at every width. Every colour the watch mode draws is checked against each theme's floor.
+
+### Changed
+
+- The README, `docs/scenes.md`, the accessibility statement, the contributing guide and the licensing notice describe the watch mode, its sounds and bacon.
+
 ## [0.1.0] - 2026-10-28
 
 ### Added

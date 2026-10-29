@@ -1,0 +1,397 @@
+{
+  "error_code": null,
+  "output": {
+    "lines": [
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Checking"
+            },
+            {
+              "csi": "",
+              "raw": " sample v0.1.0 (/work/sample)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "warning"
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": ": unused variable: `unused`"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "--> "
+            },
+            {
+              "csi": "",
+              "raw": "src/main.rs:2:9"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "2"
+            },
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            },
+            {
+              "csi": "",
+              "raw": "     let unused = 3;"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            },
+            {
+              "csi": "",
+              "raw": "         "
+            },
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "^^^^^^"
+            },
+            {
+              "csi": "",
+              "raw": " "
+            },
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "help: if this is intentional, prefix it with an underscore: `_unused`"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "|"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "",
+              "raw": "  "
+            },
+            {
+              "csi": "\u001b[1m\u001b[94m",
+              "raw": "= "
+            },
+            {
+              "csi": "\u001b[1m",
+              "raw": "note"
+            },
+            {
+              "csi": "",
+              "raw": ": `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": []
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[33m",
+              "raw": "warning"
+            },
+            {
+              "csi": "",
+              "raw": ": `sample` (bin \"sample\") generated 1 warning (run `cargo fix --bin \"sample\" -p sample` to apply 1 suggestion)"
+            }
+          ]
+        }
+      },
+      {
+        "item_idx": 0,
+        "line_type": {
+          "Raw": "StdErr"
+        },
+        "content": {
+          "strings": [
+            {
+              "csi": "\u001b[1m\u001b[92m",
+              "raw": "    Finished"
+            },
+            {
+              "csi": "",
+              "raw": " `dev` profile [unoptimized + debuginfo] target(s) in 0.14s"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "lines": [
+    {
+      "item_idx": 1,
+      "line_type": {
+        "Title": "Warning"
+      },
+      "content": {
+        "strings": [
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "warning"
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": ": unused variable: `unused`"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Location",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "--> "
+          },
+          {
+            "csi": "",
+            "raw": "src/main.rs:2:9"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "2"
+          },
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          },
+          {
+            "csi": "",
+            "raw": "     let unused = 3;"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          },
+          {
+            "csi": "",
+            "raw": "         "
+          },
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "^^^^^^"
+          },
+          {
+            "csi": "",
+            "raw": " "
+          },
+          {
+            "csi": "\u001b[1m\u001b[33m",
+            "raw": "help: if this is intentional, prefix it with an underscore: `_unused`"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "|"
+          }
+        ]
+      }
+    },
+    {
+      "item_idx": 1,
+      "line_type": "Normal",
+      "content": {
+        "strings": [
+          {
+            "csi": "",
+            "raw": "  "
+          },
+          {
+            "csi": "\u001b[1m\u001b[94m",
+            "raw": "= "
+          },
+          {
+            "csi": "\u001b[1m",
+            "raw": "note"
+          },
+          {
+            "csi": "",
+            "raw": ": `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default"
+          }
+        ]
+      }
+    }
+  ],
+  "stats": {
+    "warnings": 1,
+    "errors": 0,
+    "test_fails": 0,
+    "location_lines": 1,
+    "normal_lines": 5
+  },
+  "suggest_backtrace": false,
+  "failure_keys": [],
+  "analyzer_exports": {},
+  "has_passed_tests": false,
+  "dismissed_items": 0,
+  "dismissed_lines": []
+}

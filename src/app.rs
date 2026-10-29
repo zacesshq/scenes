@@ -185,7 +185,7 @@ pub fn run(
                     }
                 }
                 Input::Resize(w, h) => pending_resize = Some((w, h, Instant::now())),
-                Input::None => {}
+                Input::Key(_) | Input::None => {}
             }
             let settled = pending_resize.filter(|&(_, _, at)| at.elapsed() >= RESIZE_SETTLE);
             if let Some((w, h, _)) = settled {
