@@ -15,9 +15,15 @@ its code and its tests, not what it aims to do.
   key repeats are ignored, so holding `Space` never makes the line flash.
 - The mouse is not used and nothing needs a modifier key apart from `Ctrl+C`, which the terminal
   passes on as a key.
-- The watch mode adds `1` to `4` to switch the job, `r` to run it again, `p` to pause the animation
-  and `s` to turn sound on or off. Its key hint shows, dims and goes in the same way as the help
-  line, above a status bar that stays on screen.
+- `n` shows the next scene and `b` (or `N`) the one before. The new scene's name and summary show
+  on the bottom row for two and a half seconds, then dim and go like the help line. A scene changes
+  at most once every 0.4 seconds however fast the key is pressed or held, so the picture is never
+  replaced more than three times a second.
+- The watch mode adds `1` to `4` to switch the job, `r` to run it again, `p` to pause the animation,
+  `s` to turn sound on or off, `n` and `b` to change the scene, `m` to change the sound set and `+`
+  and `-` to change the volume (`=` and `_` work too, so Shift is never needed). Its key hint
+  shows, dims and goes in the same way as the help line, above a status bar that stays on screen.
+  A change of scene, sound set or volume is written in the status bar for three seconds.
 
 ## Before and after the scene
 
@@ -28,7 +34,8 @@ its code and its tests, not what it aims to do.
   `--duration`, a panic anywhere in the code or, on Linux and macOS, a `SIGTERM`, `SIGHUP`,
   `SIGQUIT` or `SIGINT` (a closed tmux pane, `kill` or `timeout`), it leaves the alternate screen,
   shows the cursor, turns raw mode off and prints `Zacess Scenes stopped.`, so the shell comes back
-  as it was. A `SIGKILL` cannot be caught by any program; after one, `reset` gives the terminal
+  as it was. When the terminal itself has gone, as with a closed tmux pane, the program ends
+  within a second of the signal rather than running on unseen. A `SIGKILL` cannot be caught by any program; after one, `reset` gives the terminal
   back. On Windows, closing the console window ends the console along with the program.
 - `--duration <minutes>` stops the scene on its own, for a screen that should not run forever.
 - The watch mode prints the same kind of line before it starts: the project, the job, the theme,
@@ -49,6 +56,13 @@ its code and its tests, not what it aims to do.
   `Control Panel\Desktop` or the `MinAnimate` value under
   `Control Panel\Desktop\WindowMetrics`). A headless render never asks the system, so it prints
   the same frame everywhere.
+- The motion level, `calm`, `standard` or `lively`, is set with `--motion`, `ZACESS_MOTION` or
+  the config file. Calm moves at 0.7 times the standard speed with fewer things on screen. Lively
+  moves at 1.35 times with more, but anything that changes in place (a pulse, a flicker, a wing
+  beat, a window light) keeps the standard pace or slower: `Motion::pace` never goes above it. The
+  flash checks run at every level.
+- Reduced motion can also be turned on in the config file. Any of the sources turns it on; none
+  of them can turn the system setting off.
 - With reduced motion on, the frame rate is capped at 12 a second, every movement runs at half
   speed (sways, wobbles, drifts and the aurora's breathing included), the rain has no lightning,
   each row of the campfire changes once every 1.5 seconds instead of every 0.6 and stars and
@@ -59,9 +73,21 @@ its code and its tests, not what it aims to do.
 
 ## Flashing
 
-Nothing in any scene flashes: no scene changes the whole screen or a large area at once. Things
-that change in place keep to the limits below, which are constants in the code with tests that
-hold them:
+Nothing in any scene flashes: no scene changes the whole screen or a large area at once.
+
+- A flash meter in `src/flash.rs` splits a frame into twelve regions plus the whole screen and
+  works out each one's brightness from how much of each cell its character covers and how far its
+  colour is from the background. A change of a tenth of the most a region can change, between two
+  frames, counts as a large change. `check_flashes` runs every built-in scene for a simulated
+  minute at two sizes, at all six combinations of motion level and reduced motion, in the
+  brightest and darkest themes. It fails if any second has more than three large changes. Two
+  opposing changes make one flash, so that is at most one and a half flashes a second, half the
+  three a second WCAG 2.3.1 allows. A test proves the meter catches a flashing screen and a
+  flashing corner and ignores a small moving shape.
+- The same meter runs live on Lua scenes, holding back any frame that would break the limit, and
+  on the frames `snapshot --frames` writes.
+- Things that change in place keep to the limits below, which are constants in the code with
+  tests that hold them:
 
 | Scene | What changes in place | How often at most | Test |
 | --- | --- | --- | --- |
@@ -75,13 +101,44 @@ hold them:
 | watch mode storm | A bolt of lightning, as in the rain | Once every 5 seconds since the last, the first one 5 seconds after the storm appears, never under reduced motion | `the_storm_keeps_the_lightning_limits` |
 | watch mode | The change between passing and failing: the scene, the banner and the list | Once per finished run of the job, in one step with no fade, flash or inverted frame. A run takes as long as the build, so seconds apart at the least | `the_state_moves_from_waiting_to_passing_to_failing_and_back` |
 | watch mode | The key hint | Fades in two steps, over 5.5 seconds, never blinks | `the_hint_shows_then_dims_then_goes` |
+| watch mode | The recovered opening: the pass scene opens out from the middle over the fail scene | Once per fix, over 2 seconds (3.5 under reduced motion, with no sparkles); each cell changes once as the edge passes | `the_opening_never_flashes_and_ends_on_the_new_scene` |
+| every scene | A change of scene with `n` or `b` | At most once every 0.4 seconds | `SCENE_DEBOUNCE` in `src/app.rs` and `src/watch/mod.rs` |
+| Lua scenes | Anything the script draws | A frame that would make a fourth large change in a second is held back; a scene held back more than ten times in ten seconds is stopped | `a_flashing_script_is_damped_then_stopped` |
+| koi-pond | A ripple's ring, which widens in four stages | One stage every 0.6 seconds, every 1.2 under reduced motion | `ripples_widen_slowly_and_tails_sway_slowly` |
+| koi-pond | A koi's tail, spread and then closed | One change every 1.2 seconds; still under reduced motion | `ripples_widen_slowly_and_tails_sway_slowly` |
+| harbour | A lamp's reflection on the water | One change every 0.8 seconds, every 1.6 under reduced motion | `the_shimmer_and_the_sway_stay_slow` |
+| harbour | A mast top, through four positions | One sway takes 4 seconds, so about one change a second; still under reduced motion | `the_shimmer_and_the_sway_stay_slow` |
+| lanterns | A lantern's sway, one column either way | One sway takes 7 seconds, 14 under reduced motion | `lanterns_sway_slowly_and_rise` |
+| countryside | A puff of smoke, through three sizes | One size a second, one every two seconds under reduced motion | `the_land_slides_past_but_the_train_stays_in_view` |
+| winter-cabin | A puff of smoke, through three sizes | One size every 1.2 seconds, every 2.4 under reduced motion | `the_cabin_window_is_lit_and_smoke_rises` |
+| autumn | A falling leaf's turn, through four positions | One turn every 0.6 seconds; no turning under reduced motion | `leaves_turn_slowly_and_the_pile_stays_low` |
+| blossom | A falling petal's turn and the bird's head | A petal every 0.7 seconds and the bird every 6 seconds; no turning petals under reduced motion | `petals_turn_slowly_and_the_bird_looks_rarely` |
+| city-night | One window lighting up or going dark | One window every 1.2 seconds, every 2.4 under reduced motion | `one_window_changes_at_a_time_and_never_quickly` |
+| constellations | A figure's lines changing colour as they fade | One step every 1.2 seconds, every 2.4 under reduced motion | `figures_are_drawn_named_and_faded_one_at_a_time` |
+| tea | A puff of steam's curl, `(` or `)` | Twice every 2.4 seconds, every 4.8 under reduced motion | `steam_rises_from_the_mug_and_sways_slowly` |
+| cat-nap | The cat's back as it breathes and its tail | The back twice every 4 seconds, the tail twice every 7, both half as often under reduced motion | `the_cat_breathes_slowly_and_its_tail_stirs_rarely` |
+| garden | A stem growing a row, a bud opening and a butterfly's wings | A stem row at most once a second, wings twice every 1.2 seconds, half as often under reduced motion | `stems_grow_slowly_and_wings_beat_slowly` |
+| tiles | One tile taking a new colour or settling to its outline | One tile every 3 seconds on a small grid and never more often than every 0.7 seconds, half as often under reduced motion | `one_tile_changes_at_a_time_and_never_quickly` |
+| flood | The water's surface row as it swells | At most twice every 12 seconds, a third of a row each way; the rise takes 45 seconds | `the_surface_row_moves_at_most_twice_a_swell` |
+| listing-ship | The ship's angle as it lists and rolls | Under two degrees a second, so the bow moves under a row a second; a roll takes 11 seconds | `the_ship_lists_slowly_then_rolls_gently_at_its_angle` |
+| corrosion | A rusty cell darkening | One stage every 8 seconds, four stages in its life | `a_cell_darkens_no_faster_than_one_stage_a_period` |
+| tangle | The cables as they tangle | The tangle grows by at most about a thirtieth of the whole a second | `the_tangle_grows_slowly` |
+| wilt | The flower heads and leaves drying | Each changes once or twice over 50 seconds; the stems sway once every 9 seconds | `stems_droop_leaves_fall_and_land_on_the_sill` |
+| fog | The fog thickening over a cell | The bank covers at most about a tenth of the screen a second; the texture drifts 1.2 columns a second over patches 9 columns wide | `the_fog_rolls_in_slowly_and_hides_the_signs`, `the_noise_is_smooth_and_in_range` |
+| broken-bridge | A splash where a fragment lands, `o` then `( )` | One fragment every 4 seconds (`FRAGMENT_PERIOD`), the splash cell changing twice in 0.7 seconds; half as often under reduced motion | `fragments_fall_slowly_and_splash_once_each` |
+| leak | A drip's splash beside the water's surface and the bucket's water level | One drip every 1.1 seconds (`DRIP_PERIOD`), the splash showing for 0.3 seconds; the water rises one row every few drips | `drips_are_slow_and_never_quicker_on_lively` |
+| blackout | A window going dark, then perhaps a candle | One window at a time, at least 0.25 seconds apart (`MIN_WINDOW_GAP`); each window changes at most twice, five seconds apart | `no_cell_changes_more_than_once_a_second_while_the_lights_go_out` |
+| traffic-jam | An exhaust puff fading from `o` to `.` | One puff a car every 3 seconds (`PUFF_PERIOD`), changing once in its 2.4 second life | `puffs_are_slow_on_every_level` |
+| erosion | A piece of the face breaking away and a splash | One piece every 2.2 seconds (`CRUMBLE_PERIOD`), then one pebble every 7 seconds; the splash cell changes twice in 0.7 seconds | `pieces_break_away_slowly_on_every_level` |
+| drought | A plate edge of cracks appearing and the puddle losing a cell | Cracks spread over 60 seconds (`CRACK_SECONDS`), each cell appearing once; the puddle loses one cell every 6 seconds (`PUDDLE_SHRINK`) | `the_puddle_shrinks_one_cell_at_a_time_at_most_every_few_seconds` |
 
 Things that move, such as drops, fish, flakes and fireflies, change the cells they pass through as
 they go. Counted cell by cell over 30 seconds at 20 by 8, 80 by 24 and 120 by 40, the most changes
 any one cell saw in a second were: rain 12 (9 under reduced motion), code rain 18 (3), sea 8 (5),
 snow, starfield, fireflies and aurora 7 (4 to 6), campfire 6 with its embers (4), waves 5 (3) and
 zacess 3 (2). These are small shapes moving across the screen, not flashes. Under reduced
-motion every one of them moves at half speed.
+motion every one of them moves at half speed. The scenes added in 0.3.0 are held by the region
+check above rather than counted cell by cell.
 
 ## Colour and contrast
 
@@ -108,6 +165,10 @@ motion every one of them moves at half speed.
   its red or yellow stands in. `every_overlay_colour_keeps_the_floor_in_every_theme` draws every
   state in all eight themes and checks every colour. It also checks that the error colour differs
   from both the warning and the passing colours.
+- Lua scenes cannot name a colour. They draw with a palette role such as `text`, `accent`,
+  `error` or `syntax.keyword`, which the program turns into the theme's colour, falling back to
+  the text colour where a role is below the floor. `every_role_keeps_the_floor_in_every_theme`
+  holds it.
 - Colour is never the only signal. Fish of different kinds are different shapes, flame layers use
   different shade characters, a star's brightness is a different character and the settled snow is
   a solid block. In the watch mode passing reads `✓ passing` with ALL GOOD, failing reads
@@ -122,23 +183,48 @@ their own words. With `NO_COLOR` set, every character is drawn in the terminal's
 
 ## Sound
 
-The scenes make no sound. The watch mode can play three short tones: a gentle rising chime when a
-run passes, a lower two-note tone when it fails and a soft tick when a rebuild starts.
+The scenes make no sound. The watch mode can play six short events in one of six sound sets:
+`bells`, `marimba`, `kalimba`, `pad`, `chip` and `glass`.
 
-- Sound is never the only signal. Every tone has the same state on screen at the same moment: the
-  banner, the scene and the status bar show passing or failing and the status bar shows `running`
-  while a rebuild runs.
-- The pass and fail tones play once when the result changes or when a key asked for the run, not on
-  every save, so a build that keeps failing stays quiet.
-- Sound is turned off with `--no-sound`, with `ZACESS_SOUND=0` (or `false`, `no` or `off`) or with
-  `s` while it runs. The status bar then says `sound off`. The volume is set from 0 to 100 with
-  `--volume` or `ZACESS_VOLUME`, 50 by default. A volume of 0 is silent.
-- The tones are synthesised by the program with soft envelopes and short fades at both ends, so they
-  never click. The loudest sample sits at 70 percent of full scale at volume 100 and never clips.
+| Event | When | On by default |
+| --- | --- | --- |
+| pass | A run passes after waiting or a key asked for it | Yes |
+| fail | A run fails after passing, on the first result or when a key asked for it | Yes |
+| tick | A rebuild starts, at 40 percent of the level | Yes |
+| recovered | A run passes after failing | Yes |
+| warnings | A passing run has more warnings than the last | Yes |
+| still_failing | A run fails again, at 30 percent of the level | No |
+
+- Sound is never the only signal. Every event has the same state on screen at the same moment: the
+  banner, the scene and the status bar show passing, failing or recovered. The status bar shows
+  `running` while a rebuild runs and the warning count.
+- Every set plays the same phrase for each event, a rising triad for a pass, a falling fourth for a
+  failure, the triad landing an octave up for a fix and a rising minor third for warnings, so the
+  meaning does not change with the timbre.
+- Every tone is levelled to the same loudness, measured as the root mean square of its loudest 50
+  milliseconds. It is kept under a peak of 70 percent of full scale. `every_set_and_event_is_levelled_to_the_same_loudness`
+  holds each tone within a decibel of its level and every set's pass tone within 1.5 decibels of
+  the others. No partial above 6 kHz is synthesised, so the 8-bit set stays soft.
+- Sound is turned off with `--no-sound`, with `ZACESS_SOUND=0` (or `false`, `no` or `off`), in the
+  config file or with `s` while it runs. The status bar then says `sound off`. Each event can be
+  turned off in the config. The volume is set from 0 to 100 with `--volume`, `ZACESS_VOLUME`, the
+  config or `+` and `-`, 50 by default. A volume of 0 is silent.
+- Quiet hours in the config, such as `22:00-07:00`, keep every event silent between two times of
+  day. The status bar says `quiet hours` while they apply.
+- The tones are synthesised with soft envelopes and short fades at both ends, so they never click.
   `no_sample_reaches_full_scale_at_any_volume` and
-  `tones_start_and_end_in_silence_so_they_never_click` hold this.
-- The longest tone, the pass chime, lasts just over a second.
+  `tones_start_and_end_in_silence_so_they_never_click` check every set and event.
+- The longest tone, the pad set's recovered phrase, lasts one and a quarter seconds.
 - Without a system player the watch mode stays silent and the status bar says `no sound player`.
+
+## Notifications
+
+`--notify`, `ZACESS_NOTIFY=1` or `enabled = true` under `[notifications]` in the config sends a
+desktop notification when a build starts failing and when it is fixed, such as `my-project: check
+failed with 2 problems.` It uses `osascript` on macOS, `notify-send` on Linux and a PowerShell
+toast on Windows, with a tray balloon where the toast is not available. VoiceOver, Orca and
+Narrator announce notifications, so the state can be heard without looking at the terminal. They
+are off by default because a notification interrupts.
 
 ## Size
 
@@ -168,8 +254,12 @@ whale, the moon and the sun, are left out on a terminal too small for them rathe
   line before the scene and the line after it.
 - The scenes make no sound and nothing gives haptic feedback. The watch mode's tones are described
   under [Sound](#sound).
-- The watch mode's status changes happen on the alternate screen, so a screen reader does not hear
-  them. Its tones are the only change heard without looking.
+- The watch mode's status changes happen on the alternate screen, so a screen reader does not read
+  them there. With `--notify` each change between passing and failing is also sent as a desktop
+  notification, which screen readers announce. Without it the tones are the only change heard
+  without looking.
+- A Lua scene is checked for flashing while it runs, not before, so its first second can hold up
+  to three large changes before frames are held back. Built-in scenes are checked in the tests.
 - The system reduced motion setting is read on macOS, GNOME and Windows (both the Animation
   effects switch in Settings and the minimise animation in the performance options). Another
   desktop needs the flag or the environment variable. A settings command that takes longer than

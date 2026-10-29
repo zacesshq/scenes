@@ -18,6 +18,37 @@ body:
         - campfire
         - waves
         - zacess
+        - koi-pond
+        - harbour
+        - lanterns
+        - balloons
+        - countryside
+        - winter-cabin
+        - autumn
+        - blossom
+        - city-night
+        - orbit
+        - constellations
+        - tea
+        - cat-nap
+        - garden
+        - tiles
+        - ribbons
+        - storm
+        - flood
+        - listing-ship
+        - corrosion
+        - tangle
+        - wilt
+        - fog
+        - broken-bridge
+        - leak
+        - blackout
+        - traffic-jam
+        - erosion
+        - drought
+        - A Lua scene of my own
+        - The watch mode
         - Every scene
         - Not about a scene
     validations:

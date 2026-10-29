@@ -29,11 +29,7 @@ pub fn reduced(flag: bool, env: Option<&str>, system: impl FnOnce() -> bool) -> 
 
 /// Runs a command and returns its standard output (`None` when it is missing, fails or takes
 /// longer than the timeout, which counts as the setting being unknown).
-#[cfg_attr(
-    not(any(target_os = "macos", target_os = "linux", target_os = "windows")),
-    allow(dead_code)
-)]
-fn command_output(program: &str, args: &[&str]) -> Option<String> {
+pub(crate) fn command_output(program: &str, args: &[&str]) -> Option<String> {
     let mut child = Command::new(program)
         .args(args)
         .stdin(Stdio::null())

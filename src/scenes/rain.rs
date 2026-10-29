@@ -148,7 +148,7 @@ impl Rain {
 
 impl Scene for Rain {
     fn name(&self) -> &'static str {
-        "rain"
+        if self.storm { "storm" } else { "rain" }
     }
 
     fn resize(&mut self, width: usize, height: usize, rng: &mut Rng) {
@@ -413,7 +413,8 @@ mod tests {
         assert!(storm_frame.row_text(1).contains('~'));
         assert!(storm_frame.to_text().contains('/'));
         assert!(!rain_frame.to_text().contains('/'));
-        assert_eq!(storm.name(), "rain");
+        assert_eq!(storm.name(), "storm");
+        assert_eq!(rain.name(), "rain");
     }
 
     #[test]

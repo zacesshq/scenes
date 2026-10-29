@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- 16 new pass scenes: `koi-pond`, `harbour`, `lanterns`, `balloons`, `countryside`, `winter-cabin`, `autumn`, `blossom`, `city-night`, `orbit`, `constellations`, `tea`, `cat-nap`, `garden`, `tiles` and `ribbons`. With the original ten, 26 scenes can show while a build passes. Each has captions of its own.
+- 12 new fail scenes that read as something gone wrong without ever flashing, shaking or spinning, namely `flood`, `listing-ship`, `corrosion`, `tangle`, `wilt`, `fog`, `broken-bridge`, `leak`, `blackout`, `traffic-jam`, `erosion` and `drought`. The storm is now a scene of its own, `storm`, so there are 13. Each progresses slowly and then holds, so it still looks right after an hour. Each has captions.
+- A recovered moment: when a failing build is fixed, the pass scene opens out from the middle over the fail scene in two seconds with a ring of small sparkles, the status bar reads `recovered` and a recovered caption shows. Under reduced motion it takes three and a half seconds with no sparkles.
+- Six sound sets, all synthesised at run time, namely `bells` (the original tones), `marimba`, `kalimba`, `pad`, `chip` and `glass`. Each has tones for a pass, a failure, a rebuild tick, a fix, a build that is still failing (very quiet and off by default) and new warnings. Every set plays the same phrase for each event, so the meaning carries over. Every tone is levelled to the same loudness with a peak ceiling.
+- A config file at `$XDG_CONFIG_HOME/zacess/scenes.toml` or `~/.config/zacess/scenes.toml` on macOS and Linux and `%APPDATA%\zacess\scenes.toml` on Windows, read by a small TOML parser of our own. It holds the theme, the pass and fail scene lists, the rotation (fixed, cycle or shuffle) and its interval, the motion level, reduced motion, captions, the banner, sound, the sound set, the volume, quiet hours, per-event sound switches and notifications. `ZACESS_CONFIG` points at another file.
+- Commands: `zacess-scenes list`, `config init` (a fully commented starter that changes nothing until a line is uncommented, refusing to replace a file without `--force`), `config path`, `sounds play <set> [event]`, `scene new <name>` and `snapshot <scene>`.
+- Flags: `--scene`, `--fail-scene`, `--sounds`, `--motion` (calm, standard or lively) and `--notify` with `--no-notify`, plus the `ZACESS_SCENE`, `ZACESS_FAIL_SCENE`, `ZACESS_SOUNDS`, `ZACESS_MOTION` and `ZACESS_NOTIFY` variables. A flag wins over a variable, which wins over the config file, which wins over the default.
+- Watch mode keys: `n` for the next scene, `N` or `b` for the one before, `m` for the next sound set and `+` and `-` for the volume. The status bar names the new scene, sound set or volume for three seconds. The standalone scenes take `n` and `b` too and name the new scene on the bottom row.
+- Desktop notifications with `--notify`: when a build starts failing and when it is fixed, through `osascript` on macOS, `notify-send` on Linux and a PowerShell toast on Windows with a tray balloon as the fallback. A screen reader announces them, so the state can now be heard without looking at the terminal.
+- Lua scenes of your own: `.lua` files in the `scenes` folder beside the config file are loaded as extra scenes with a name, a kind and captions, listed by `list` and usable everywhere a built-in scene is. Lua 5.4 is compiled into the binary through mlua, so nothing needs installing. Scripts draw with `put(x, y, text, role)`, where the role is a palette role name and never a raw colour, so every colour keeps the contrast floor. They run in a sandbox without io, os, require, load or debug, with an instruction budget per frame and a memory limit. A frame that would change a large area more than three times a second is held back, a scene that keeps flashing is stopped and any error shows in the panel and the status bar while a built-in scene takes over. Optional `on_pass`, `on_fail` and `on_recovered` hooks can return a caption. `examples/scenes/lantern.lua` is a worked example and `docs/lua.md` is the reference.
+- `zacess-scenes snapshot <scene>` draws a scene with the real renderer into a self-contained SVG still in a terminal window frame with `role="img"` and an `aria-label` or, with `--frames`, into compact JSON frames for a web page to play. It works for Lua scenes and, with `--state pass` or `--state fail`, for the watch mode with sample data. Frames go through the flash meter.
+- A gallery: an SVG still of every scene in `docs/images/scenes`, two watch mode shots and a Light theme example, plus showcase frames in `docs/frames`, all made by `scripts/snapshots.sh`. CI fails when they are out of date.
+- A flash meter (`src/flash.rs`) that measures the brightness of each region of a frame. Every scene is now checked in all eight themes at four sizes and six motion settings for contrast, for characters every supported font has, for odd sizes and for no more than three large changes of brightness in any second.
+- CI builds the release targets (Intel macOS and both musl Linux targets) on every pull request, renders the example Lua scene on Linux, macOS and Windows and checks the gallery.
+
+### Fixed
+
+- Closing the terminal under a running scene, such as a closed tmux pane or a dropped SSH session, no longer leaves the program spinning a processor core at 100 percent. crossterm's read loop never returns once its terminal has gone, so after a termination signal the program now gives the run loop one second to end and then ends on its own. This affected 0.1.0 and 0.2.0 too.
+
+### Changed
+
+- The watch mode's scene lists default to `waves` and `storm` first, then every other pass or fail scene, so `n` has somewhere to go. Captions now come from the scene showing and a short caption sits above the errors while failing.
+- The lively motion level moves things faster and draws more of them but never changes anything in place faster than the standard level. The wing beats in `waves` follow that rule.
+- The help, the README, `docs/scenes.md`, the accessibility statement, the contributing guide, the issue forms and the licensing notice cover the new scenes, sound sets, config, keys, notifications, Lua scenes and snapshots.
+
 ## [0.2.0] - 2026-10-29
 
 ### Added

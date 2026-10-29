@@ -30,7 +30,15 @@ pub struct View<'a> {
     pub report: Option<&'a Report>,
     /// Seconds since the last result.
     pub ago: Option<u64>,
-    pub caption: &'a str,
+    /// The line under the banner, `None` with captions turned off.
+    pub caption: Option<&'a str>,
+    /// Whether the large banner is drawn. Without it the state is still written on one line.
+    pub banner: bool,
+    /// The build has just passed after failing.
+    pub recovered: bool,
+    /// A problem with the scene itself, such as a user scene's script error, shown in the panel
+    /// in the warning colour.
+    pub alert: Option<&'a str>,
     /// Why bacon stopped, when it did.
     pub message: Option<&'a str>,
     /// Short notes for the status bar, such as `sound off`.
@@ -163,7 +171,12 @@ pub fn status_spans(view: &View, theme: &ThemeData, width: usize) -> Vec<Span> {
     };
     match view.phase {
         Phase::Passing => {
-            state.push((format!("{} passing", check_mark()), success_colour(theme)));
+            let word = if view.recovered {
+                "recovered"
+            } else {
+                "passing"
+            };
+            state.push((format!("{} {word}", check_mark()), success_colour(theme)));
             state.push(warning_span());
         }
         Phase::Failing => {
@@ -250,12 +263,14 @@ pub fn status_text(view: &View, theme: &ThemeData, width: usize) -> String {
 
 /// The key hint for a width.
 pub fn hint_text(width: usize) -> &'static str {
-    if width >= 78 {
-        "q quits, 1 to 4 switch the job, r reruns, p pauses, s turns sound on or off"
+    if width >= 118 {
+        "q quits, 1 to 4 switch the job, r reruns, n and b change the scene, m the sounds, + and - the volume, s sound, p pauses"
+    } else if width >= 64 {
+        "q quit  1-4 job  r rerun  n/b scene  m sounds  +/- volume  s sound"
     } else if width >= 44 {
-        "q quit  1-4 job  r rerun  p pause  s sound"
+        "q quit  1-4 job  r rerun  n scene  m sounds"
     } else {
-        "q quit  r rerun  s sound"
+        "q quit  r rerun  n scene"
     }
 }
 
@@ -284,6 +299,9 @@ pub struct Line {
 pub fn detail_lines(view: &View, theme: &ThemeData, max: usize) -> Vec<Line> {
     let mut lines = Vec::new();
     let line = |text: String, colour: Rgb| Line { text, colour };
+    if let Some(alert) = view.alert {
+        lines.push(line(format!("! {alert}"), warning_colour(theme)));
+    }
     match view.phase {
         Phase::Waiting => {
             lines.push(line(
@@ -308,9 +326,16 @@ pub fn detail_lines(view: &View, theme: &ThemeData, max: usize) -> Vec<Line> {
             return lines;
         }
         Phase::Passing => {
-            lines.push(line(view.caption.to_string(), theme.foreground));
+            if let Some(caption) = view.caption {
+                lines.push(line(caption.to_string(), theme.foreground));
+            }
         }
-        Phase::Failing => {}
+        Phase::Failing => {
+            // the caption gives way to the errors on a short screen
+            if let Some(caption) = view.caption.filter(|_| max >= 6) {
+                lines.push(line(caption.to_string(), theme.foreground));
+            }
+        }
     }
     let Some(report) = view.report else {
         return lines;
@@ -383,7 +408,7 @@ pub fn draw(frame: &mut Frame, theme: &ThemeData, view: &View) {
     let rows = banner.map(banner_rows);
     let big = rows
         .as_ref()
-        .is_some_and(|r| r[0].chars().count() + 4 <= width && room >= 12);
+        .is_some_and(|r| view.banner && r[0].chars().count() + 4 <= width && room >= 12);
     let banner_height = match (banner, big) {
         (None, _) => 0,
         (Some(_), true) => 6,
@@ -495,7 +520,10 @@ mod tests {
             running: false,
             report,
             ago: Some(12),
-            caption: "Everything builds.",
+            caption: Some("Everything builds."),
+            banner: true,
+            recovered: false,
+            alert: None,
             message: None,
             notes: Vec::new(),
             hint_age: None,
@@ -640,7 +668,7 @@ mod tests {
         }
         let lines = detail_lines(&view(Phase::Failing, Some(&report)), theme, 9);
         assert_eq!(lines.len(), 9);
-        assert_eq!(lines.last().unwrap().text, "and 26 more");
+        assert_eq!(lines.last().unwrap().text, "and 27 more");
     }
 
     #[test]
@@ -681,7 +709,7 @@ mod tests {
         let mut frame = Frame::new(80, 24);
         v.hint_age = Some(0.0);
         draw(&mut frame, theme, &v);
-        assert!(frame.row_text(22).starts_with("q quits"));
+        assert!(frame.row_text(22).starts_with("q quit"));
         assert_eq!(frame.get(0, 22).unwrap().colour, Some(theme.foreground));
         v.hint_age = Some(crate::app::HELP_SHOWN + 0.5);
         frame.clear();
@@ -694,6 +722,43 @@ mod tests {
         for width in [20, 44, 78, 120] {
             assert!(hint_text(width).chars().count() <= width.max(24));
         }
+    }
+
+    #[test]
+    fn recovered_banner_off_and_captions_off_still_say_the_state() {
+        let theme = theme::default_theme();
+        let clean = Report::default();
+        let mut alerted = view(Phase::Passing, Some(&clean));
+        alerted.alert = Some("mine stopped: mine.lua:3: boom. Showing waves.");
+        let lines = detail_lines(&alerted, theme, 10);
+        assert!(lines[0].text.starts_with("! mine stopped"));
+        assert_eq!(lines[0].colour, warning_colour(theme));
+        let mut recovered = view(Phase::Passing, Some(&clean));
+        recovered.recovered = true;
+        assert!(status_text(&recovered, theme, 120).contains("\u{2713} recovered"));
+
+        let mut plain = view(Phase::Passing, Some(&clean));
+        plain.banner = false;
+        plain.caption = None;
+        let mut frame = Frame::new(80, 24);
+        draw(&mut frame, theme, &plain);
+        let text = frame.to_text();
+        assert!(text.contains("\u{2713} ALL GOOD"), "{text}");
+        assert!(!text.contains('\u{2588}'));
+        assert!(!text.contains("Everything builds."));
+
+        let report = failing();
+        let mut failed = view(Phase::Failing, Some(&report));
+        failed.caption = Some("Rough weather in the build.");
+        let lines = detail_lines(&failed, theme, 12);
+        assert_eq!(lines[0].text, "Rough weather in the build.");
+        // a short screen keeps the room for the errors
+        let short = detail_lines(&failed, theme, 4);
+        assert!(
+            short
+                .iter()
+                .all(|l| l.text != "Rough weather in the build.")
+        );
     }
 
     #[test]
