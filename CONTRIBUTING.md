@@ -108,8 +108,9 @@ floor for a stronger palette colour. The shared checks fail on any colour that s
 ## Releasing
 
 1. Bump `version` in `Cargo.toml` (and `Cargo.lock` by running `cargo build`), move the
-   changelog's `Unreleased` entries into a section for the version and merge that through a pull
-   request.
+   changelog's `Unreleased` entries into a section for the version, move the tag in the README's
+   Cargo install command and its checksum example to the new version and merge that through a
+   pull request.
 2. A maintainer tags the merged commit with a signed annotated tag, pushes it and creates the
    GitHub release from the tag with that version's changelog section as the notes.
 3. The tag runs [`release.yml`](.github/workflows/release.yml), which builds the binaries for every

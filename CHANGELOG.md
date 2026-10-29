@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- The README installs with Cargo from the release tag on GitHub, since the crate is not on crates.io yet. It also lists mlua and the C compiler that building Lua needs.
+
 ## [0.3.0] - 2026-10-29
 
 ### Added
