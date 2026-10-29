@@ -93,12 +93,14 @@ right after an hour.
 
 ### With Cargo
 
+Zacess Scenes is not on crates.io yet, so Cargo installs it from a release tag here:
+
 ```sh
-cargo install zacess-scenes
+cargo install --locked --git https://github.com/zacesshq/scenes --tag v0.3.0 zacess-scenes
 ```
 
-Rust 1.85 or later. The only dependency is crossterm, plus signal-hook on Unix, which crossterm
-already uses.
+Rust 1.85 or later and a C compiler, since Lua 5.4 is built into the program. The dependencies are
+crossterm, mlua with its own copy of Lua and signal-hook on Unix.
 
 ### From a release
 
