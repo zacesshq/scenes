@@ -2,6 +2,7 @@
 //! problems, the key hint and the status bar. Everything is drawn into a frame, so it is tested
 //! without a terminal.
 
+use super::Mode;
 use crate::colour::Rgb;
 use crate::frame::Frame;
 use crate::glyphs;
@@ -15,7 +16,7 @@ pub enum Phase {
     Waiting,
     Passing,
     Failing,
-    /// bacon stopped on its own.
+    /// The source stopped on its own: bacon quit or the command could not start.
     Stopped,
 }
 
@@ -24,6 +25,10 @@ pub enum Phase {
 pub struct View<'a> {
     pub project: &'a str,
     pub job: &'a str,
+    /// Where the results come from, which changes the wording and the keys.
+    pub mode: Mode,
+    /// The latest result is a command that was not found.
+    pub typo: bool,
     pub phase: Phase,
     /// A run is under way, after an earlier result or before the first.
     pub running: bool,
@@ -39,7 +44,7 @@ pub struct View<'a> {
     /// A problem with the scene itself, such as a user scene's script error, shown in the panel
     /// in the warning colour.
     pub alert: Option<&'a str>,
-    /// Why bacon stopped, when it did.
+    /// Why the source stopped, when it did.
     pub message: Option<&'a str>,
     /// Short notes for the status bar, such as `sound off`.
     pub notes: Vec<&'a str>,
@@ -58,6 +63,9 @@ fn glyph(ch: char) -> &'static [&'static str; 5] {
         'G' => &[".###", "#...", "#.##", "#..#", ".###"],
         'I' => &["###", ".#.", ".#.", ".#.", "###"],
         'L' => &["#...", "#...", "#...", "#...", "####"],
+        'P' => &["###.", "#..#", "###.", "#...", "#..."],
+        'T' => &["###", ".#.", ".#.", ".#.", ".#."],
+        'Y' => &["#.#", "#.#", ".#.", ".#.", ".#."],
         'O' => &[".##.", "#..#", "#..#", "#..#", ".##."],
         'U' => &["#..#", "#..#", "#..#", "#..#", ".##."],
         // the check mark and the cross that open each banner
@@ -81,12 +89,24 @@ pub fn banner_rows(text: &str) -> [String; 5] {
     rows
 }
 
-/// The banner's text with its leading mark: `+` for the check and `x` for the cross.
-fn banner_text(phase: Phase) -> Option<&'static str> {
+/// The banner's text with its leading mark: `+` for the check and `x` for the cross. A failed
+/// command is not always a build, so outside bacon the banner says only FAILED (TYPO for a
+/// command that was not found).
+fn banner_text(phase: Phase, mode: Mode, typo: bool) -> Option<&'static str> {
     match phase {
         Phase::Passing => Some("+ ALL GOOD"),
-        Phase::Failing => Some("x BUILD FAILED"),
+        Phase::Failing if typo => Some("x TYPO"),
+        Phase::Failing if mode == Mode::Bacon => Some("x BUILD FAILED"),
+        Phase::Failing => Some("x FAILED"),
         _ => None,
+    }
+}
+
+/// What the status bar and the panel call a stopped source.
+fn stopped_text(mode: Mode) -> &'static str {
+    match mode {
+        Mode::Bacon => "bacon stopped",
+        _ => "the command stopped",
     }
 }
 
@@ -158,6 +178,8 @@ pub fn status_spans(view: &View, theme: &ThemeData, width: usize) -> Vec<Span> {
     let muted = theme.muted;
     let mut state: Vec<Span> = Vec::new();
     let warnings = view.report.map_or(0, |r| r.warnings);
+    // only bacon reports warnings, so elsewhere a count of none would say nothing true
+    let counts_warnings = view.mode == Mode::Bacon;
     let warning_span = || {
         let colour = if warnings > 0 {
             warning_colour(theme)
@@ -177,7 +199,12 @@ pub fn status_spans(view: &View, theme: &ThemeData, width: usize) -> Vec<Span> {
                 "passing"
             };
             state.push((format!("{} {word}", check_mark()), success_colour(theme)));
-            state.push(warning_span());
+            if counts_warnings {
+                state.push(warning_span());
+            }
+        }
+        Phase::Failing if view.typo => {
+            state.push((format!("{} typo", cross()), error_colour(theme)));
         }
         Phase::Failing => {
             state.push((format!("{} failing", cross()), error_colour(theme)));
@@ -198,10 +225,15 @@ pub fn status_spans(view: &View, theme: &ThemeData, width: usize) -> Vec<Span> {
                     ));
                 }
             }
-            state.push(warning_span());
+            if counts_warnings {
+                state.push(warning_span());
+            }
+        }
+        Phase::Waiting if view.mode == Mode::Follow => {
+            state.push(("waiting".to_string(), theme.foreground))
         }
         Phase::Waiting => state.push(("running".to_string(), theme.foreground)),
-        Phase::Stopped => state.push(("bacon stopped".to_string(), error_colour(theme))),
+        Phase::Stopped => state.push((stopped_text(view.mode).to_string(), error_colour(theme))),
     }
     if view.running && view.phase != Phase::Waiting {
         state.push((" \u{b7} running".to_string(), theme.foreground));
@@ -262,16 +294,50 @@ pub fn status_text(view: &View, theme: &ThemeData, width: usize) -> String {
 }
 
 /// The key hint for a width.
-pub fn hint_text(width: usize) -> &'static str {
-    if width >= 118 {
+pub fn hint_text(width: usize, mode: Mode) -> &'static str {
+    match mode {
+        Mode::Bacon => {}
+        Mode::Command => {
+            return if width >= 107 {
+                "q quits, r reruns, n and b change the scene, m the sounds, + and - the volume, a ambient, s sound, p pauses"
+            } else if width >= 68 {
+                "q quit  r rerun  n/b scene  m sounds  +/- volume  a ambient  s sound"
+            } else if width >= 45 {
+                "q quit  r rerun  n scene  m sounds  a ambient"
+            } else {
+                "q quit  r rerun  n scene"
+            };
+        }
+        Mode::Follow => {
+            return if width >= 97 {
+                "q quits, n and b change the scene, m the sounds, + and - the volume, a ambient, s sound, p pauses"
+            } else if width >= 59 {
+                "q quit  n/b scene  m sounds  +/- volume  a ambient  s sound"
+            } else if width >= 36 {
+                "q quit  n scene  m sounds  a ambient"
+            } else {
+                "q quit  n scene"
+            };
+        }
+    }
+    if width >= 119 {
         "q quits, 1 to 4 switch the job, r reruns, n and b change the scene, m the sounds, + and - the volume, s sound, p pauses"
-    } else if width >= 64 {
+    } else if width >= 66 {
         "q quit  1-4 job  r rerun  n/b scene  m sounds  +/- volume  s sound"
     } else if width >= 44 {
         "q quit  1-4 job  r rerun  n scene  m sounds"
     } else {
         "q quit  r rerun  n scene"
     }
+}
+
+/// Text with its first letter in capitals.
+fn capitalised(text: &str) -> String {
+    let mut chars = text.chars();
+    chars
+        .next()
+        .map(|first| first.to_uppercase().chain(chars).collect())
+        .unwrap_or_default()
 }
 
 /// Cuts text to a width, ending with an ellipsis when anything was cut.
@@ -304,18 +370,31 @@ pub fn detail_lines(view: &View, theme: &ThemeData, max: usize) -> Vec<Line> {
     }
     match view.phase {
         Phase::Waiting => {
-            lines.push(line(
-                format!("Running the {} job with bacon", view.job),
-                theme.foreground,
-            ));
-            lines.push(line(
-                "The scene changes when the first run finishes.".to_string(),
-                theme.muted,
-            ));
+            let (doing, then) = match view.mode {
+                Mode::Bacon => (
+                    format!("Running the {} job with bacon", view.job),
+                    "The scene changes when the first run finishes.",
+                ),
+                Mode::Command => (
+                    format!("Running {}", view.job),
+                    "The scene changes when the first run finishes and again on each save.",
+                ),
+                Mode::Follow => (
+                    format!("Following {}", view.job),
+                    "The scene changes when the next command there finishes.",
+                ),
+            };
+            lines.push(line(doing, theme.foreground));
+            lines.push(line(then.to_string(), theme.muted));
             return lines;
         }
         Phase::Stopped => {
-            lines.push(line("bacon stopped.".to_string(), error_colour(theme)));
+            // bacon keeps its own lowercase name at the start of the line
+            let text = match view.mode {
+                Mode::Bacon => format!("{}.", stopped_text(view.mode)),
+                _ => format!("{}.", capitalised(stopped_text(view.mode))),
+            };
+            lines.push(line(text, error_colour(theme)));
             if let Some(message) = view.message.filter(|m| !m.is_empty()) {
                 lines.push(line(message.to_string(), theme.foreground));
             }
@@ -399,12 +478,17 @@ pub fn draw(frame: &mut Frame, theme: &ThemeData, view: &View) {
     if let Some(colour) = hint_colour.filter(|_| height >= 4) {
         bottom -= 1;
         frame.fill_row(bottom, ' ', None);
-        frame.put_str(0, bottom, &fit(hint_text(width), width), Some(colour));
+        frame.put_str(
+            0,
+            bottom,
+            &fit(hint_text(width, view.mode), width),
+            Some(colour),
+        );
     }
 
     // the panel: banner, then the details, centred in the rows above
     let room = bottom.max(0) as usize;
-    let banner = banner_text(view.phase);
+    let banner = banner_text(view.phase, view.mode, view.typo);
     let rows = banner.map(banner_rows);
     let big = rows
         .as_ref()
@@ -516,6 +600,8 @@ mod tests {
         View {
             project: "sample",
             job: "check",
+            mode: Mode::Bacon,
+            typo: false,
             phase,
             running: false,
             report,
@@ -719,9 +805,42 @@ mod tests {
         frame.clear();
         draw(&mut frame, theme, &v);
         assert!(!frame.row_text(22).starts_with("q quits"));
-        for width in [20, 44, 78, 120] {
-            assert!(hint_text(width).chars().count() <= width.max(24));
+        for mode in [Mode::Bacon, Mode::Command, Mode::Follow] {
+            for width in [20, 36, 44, 45, 59, 64, 66, 68, 78, 97, 107, 118, 119, 120] {
+                let hint = hint_text(width, mode);
+                assert!(
+                    hint.chars().count() <= width.max(24),
+                    "{mode:?} at {width}: {hint}"
+                );
+            }
         }
+    }
+
+    #[test]
+    fn outside_bacon_the_banner_says_failed_or_typo_and_follow_waits() {
+        let theme = theme::default_theme();
+        let mut frame = Frame::new(100, 30);
+        let fail = failing();
+        let mut v = view(Phase::Failing, Some(&fail));
+        v.mode = Mode::Command;
+        assert_eq!(banner_text(v.phase, v.mode, v.typo), Some("x FAILED"));
+        v.typo = true;
+        assert_eq!(banner_text(v.phase, v.mode, v.typo), Some("x TYPO"));
+        for ch in "TYPO FAILED".chars().filter(|c| *c != ' ') {
+            assert_ne!(glyph(ch)[0], "..", "{ch} has a glyph");
+        }
+        let mut waiting = view(Phase::Waiting, None);
+        waiting.mode = Mode::Follow;
+        waiting.job = "the dev session";
+        draw(&mut frame, theme, &waiting);
+        let text = frame.to_text();
+        assert!(text.contains("Following the dev session"), "{text}");
+        assert!(status_text(&waiting, theme, 100).contains("waiting"));
+        let mut stopped = view(Phase::Stopped, None);
+        stopped.mode = Mode::Command;
+        frame.clear();
+        draw(&mut frame, theme, &stopped);
+        assert!(frame.to_text().contains("The command stopped."));
     }
 
     #[test]

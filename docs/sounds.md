@@ -1,8 +1,10 @@
 # Sound sets
 
-The watch mode plays a short tone for each change in a build. Every set plays the same short
+The watch and follow modes play a short tone for each change in a build or a command. Any scene
+can also play a quiet [background sound](#background-sound). Every set plays the same short
 phrase for each event, so the meaning carries over when the set changes: a rising triad for a pass, a falling fourth for a failure, the triad landing an octave up
-for a fix and a rising minor third for new warnings. Only the timbre differs.
+for a fix, a rising minor third for new warnings and two soft low notes for a typo. Only the timbre
+differs.
 
 | Set | Sounds like |
 | --- | --- |
@@ -23,6 +25,7 @@ for a fix and a rising minor third for new warnings. Only the timbre differs.
 | `recovered` | A run passes after failing | Yes |
 | `warnings` | A passing run has more warnings than the last | Yes |
 | `still_failing` | A run fails again. Very quiet | No |
+| `typo` | A followed command was not found. Softer than a failure | Yes |
 
 ```sh
 zacess-scenes sounds play marimba            # the pass tone
@@ -50,3 +53,32 @@ player there is no sound and the status bar says `no sound player`.
 | One event on or off | | | `[sound.events]` |
 
 Every tone has the same state on screen, so sound is never the only signal.
+
+## Background sound
+
+A quiet sound that suits the scene, playing under it the whole time it shows. It is off unless
+turned on and it is quieter than the tones: 20 out of 100 by default against the tones' 50. While a
+tone plays the background sound stops for a moment and then carries on, so a pass or a failure is
+always heard clearly. The players are separate programs, so it stops rather than fades.
+
+| Sound | Plays under |
+| --- | --- |
+| Water: slow waves | `sea`, `waves`, `koi-pond`, `harbour`, `lanterns`, `flood`, `listing-ship`, `broken-bridge`, `leak` and `erosion` |
+| Rain: a steady hiss with soft drops | `rain`, `storm` and `tea` |
+| Wind: slow gusts | `snow`, `aurora`, `balloons`, `countryside`, `autumn`, `blossom`, `wilt`, `fog` and `drought` |
+| Fire: a low rumble and soft crackles | `campfire` and `winter-cabin` |
+| Night: a quiet bed with the odd cricket | Every other scene, your own Lua scenes included |
+
+Each sound is a 20 second loop made by the program from seeded noise, so it is always the same and
+cached like the tones. The loop is started again as it ends, which leaves a gap of a few
+milliseconds. It pauses with the scene, follows a change of scene and keeps quiet during quiet hours.
+Turning sound off with `--no-sound`, `ZACESS_SOUND=0` or the config turns it off too.
+
+| Setting | Flag | Environment variable | Config |
+| --- | --- | --- | --- |
+| On | `--ambient` | `ZACESS_AMBIENT=1` | `enabled = true` under `[ambient]` |
+| Off for one run | `--no-ambient` | `ZACESS_AMBIENT=0` | |
+| Volume from 0 to 100, 20 by default | `--ambient-volume <n>` | | `volume` under `[ambient]` |
+
+`a` turns it on or off while a scene runs and `[` and `]` change its volume. A scene run on its own
+has no tones, so `m`, `+` and `-` work the background sound there too.

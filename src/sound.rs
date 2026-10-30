@@ -62,16 +62,19 @@ pub enum Tone {
     StillFailing,
     /// A passing run has warnings it did not have before.
     Warnings,
+    /// A command in a followed shell was not found, which is almost always a typo.
+    Typo,
 }
 
 impl Tone {
-    pub const ALL: [Tone; 6] = [
+    pub const ALL: [Tone; 7] = [
         Tone::Pass,
         Tone::Fail,
         Tone::Tick,
         Tone::Recovered,
         Tone::StillFailing,
         Tone::Warnings,
+        Tone::Typo,
     ];
 
     /// The name used in the config file and by `sounds play`.
@@ -83,6 +86,7 @@ impl Tone {
             Tone::Recovered => "recovered",
             Tone::StillFailing => "still_failing",
             Tone::Warnings => "warnings",
+            Tone::Typo => "typo",
         }
     }
 
@@ -97,6 +101,8 @@ impl Tone {
         match self {
             Tone::Tick => 0.4,
             Tone::StillFailing => 0.3,
+            // a mistyped command is common and small, so it is a nudge rather than an alarm
+            Tone::Typo => 0.6,
             _ => 1.0,
         }
     }
@@ -333,6 +339,8 @@ fn phrase(tone: Tone) -> (Vec<Note>, f32) {
         Tone::StillFailing => (vec![note(233.08, 0.0)], 0.45),
         // a rising minor third, a question rather than an alarm
         Tone::Warnings => (vec![note(440.0, 0.0), note(523.25, 0.16)], 0.55),
+        // two quick low notes a step apart, a soft shrug that is clearly not the fail phrase
+        Tone::Typo => (vec![note(392.0, 0.0), note(349.23, 0.09)], 0.35),
     }
 }
 

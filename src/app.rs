@@ -3,12 +3,15 @@
 use std::io;
 use std::time::{Duration, Instant};
 
+use crate::ambient::Ambient;
 use crate::catalogue::Catalogue;
+use crate::config::Rotation;
 use crate::frame::Frame;
 use crate::rng::Rng;
 use crate::scene::{Motion, Scene};
 use crate::terminal::{Input, Terminal};
 use crate::theme::ThemeData;
+use crate::watch::Lineup;
 
 /// The frame rate ceiling under reduced motion.
 pub const CALM_FPS: u32 = 12;
@@ -150,12 +153,50 @@ pub fn pause_accepted(last_press: &mut Option<Instant>, now: Instant) -> bool {
     accepted
 }
 
+/// The shortest time between scenes on a timer.
+pub const MIN_EVERY: Duration = Duration::from_secs(3);
+
+/// Moving to another scene on a timer, through a list of scenes.
+pub struct Auto {
+    pub rotation: Rotation,
+    pub every: Duration,
+    pub lineup: Lineup,
+}
+
+impl Auto {
+    /// A timer over `names` that starts on `first` when it is in the list. Fixed rotation is
+    /// taken as cycle, since a timer that never moves would do nothing.
+    pub fn new(rotation: Rotation, every: Duration, names: Vec<String>, first: &str) -> Self {
+        let rotation = if rotation == Rotation::Fixed {
+            Rotation::Cycle
+        } else {
+            rotation
+        };
+        // each change replaces the whole picture, so however small the asked for time, scenes
+        // never change faster than this
+        let every = every.max(MIN_EVERY);
+        let mut lineup = Lineup::new(names, first);
+        if let Some(at) = lineup.names.iter().position(|n| n == first) {
+            lineup.index = at;
+        }
+        Self {
+            rotation,
+            every,
+            lineup,
+        }
+    }
+}
+
 /// The scenes the standalone mode steps through with `n` and `b` and the one showing.
 pub struct Playlist<'a> {
     pub catalogue: &'a mut Catalogue,
     pub names: Vec<String>,
     pub index: usize,
     pub motion: Motion,
+    /// Moving on by itself, when asked for.
+    pub auto: Option<Auto>,
+    /// The background sound, when there is a player for it.
+    pub ambient: Option<Ambient>,
 }
 
 impl Playlist<'_> {
@@ -203,6 +244,19 @@ impl Playlist<'_> {
     }
 }
 
+/// The line shown when the scene changes: its name and summary (why a scene was skipped instead).
+fn scene_label(playlist: &Playlist, note: Option<String>) -> String {
+    if let Some(note) = note {
+        return format!("scene error: {note}");
+    }
+    let summary = playlist
+        .catalogue
+        .find(playlist.current())
+        .map(|e| e.summary.clone())
+        .unwrap_or_default();
+    format!("{}: {summary}", playlist.current())
+}
+
 /// Runs scenes in the terminal until a quit key, a termination signal or the duration ends. `n`
 /// and `b` move through the playlist.
 pub fn run(
@@ -227,8 +281,43 @@ pub fn run(
     let mut help_age: Option<f32> = Some(0.0);
     let mut pending_resize: Option<(usize, usize, Instant)> = None;
     let mut needs_draw = true;
+    let mut picked_at = Instant::now();
 
     loop {
+        if let Some(ambient) = playlist.ambient.as_mut() {
+            let name = playlist.names[playlist.index % playlist.names.len()].clone();
+            ambient.set_scene(&name);
+            ambient.pause(paused);
+            ambient.tick();
+        }
+        let due = playlist
+            .auto
+            .as_ref()
+            .is_some_and(|auto| !paused && picked_at.elapsed() >= auto.every);
+        if due {
+            picked_at = Instant::now();
+            let showing = playlist.current().to_string();
+            if let Some(auto) = playlist.auto.as_mut() {
+                // a pick that is the scene already showing, after n or b or a retired scene, is
+                // passed over so the timer never spends a turn on no change
+                for _ in 0..auto.lineup.names.len().max(1) {
+                    auto.lineup.rotate(auto.rotation, rng);
+                    let next = auto.lineup.current();
+                    if next != showing && playlist.names.iter().any(|n| n == next) {
+                        break;
+                    }
+                }
+                let next = auto.lineup.current().to_string();
+                if let Some(at) = playlist.names.iter().position(|n| *n == next) {
+                    playlist.index = at;
+                }
+            }
+            let (w, h) = (frame.width(), frame.height());
+            let (next, note) = playlist.build(w, h, rng);
+            scene = next;
+            label = Some((scene_label(playlist, note), 0.0));
+            needs_draw = true;
+        }
         if let Some(problem) = scene.problem() {
             let name = playlist.current().to_string();
             playlist.catalogue.retire(&name);
@@ -302,20 +391,32 @@ pub fn run(
                         let (w, h) = (frame.width(), frame.height());
                         let (next, note) = playlist.build(w, h, rng);
                         scene = next;
-                        let summary = playlist
-                            .catalogue
-                            .find(playlist.current())
-                            .map(|e| e.summary.clone())
-                            .unwrap_or_default();
-                        label = Some((
-                            note.map(|n| format!("scene error: {n}"))
-                                .unwrap_or_else(|| format!("{}: {summary}", playlist.current())),
-                            0.0,
-                        ));
+                        label = Some((scene_label(playlist, note), 0.0));
+                        // a scene picked by hand gets a full turn before the timer moves on
+                        picked_at = Instant::now();
                         needs_draw = true;
                         if idle {
                             break;
                         }
+                    }
+                }
+                Input::Key(key @ ('a' | 'm' | '+' | '-' | '[' | ']')) => {
+                    let text = match playlist.ambient.as_mut() {
+                        None => "no sound player for the background sound".to_string(),
+                        Some(ambient) if matches!(key, 'a' | 'm') => {
+                            ambient.toggle();
+                            let state = if ambient.enabled() { "on" } else { "off" };
+                            format!("background sound {state}")
+                        }
+                        Some(ambient) => {
+                            let volume = ambient.change_volume(matches!(key, '+' | ']'));
+                            format!("background sound volume {volume}")
+                        }
+                    };
+                    label = Some((text, 0.0));
+                    needs_draw = true;
+                    if idle {
+                        break;
                     }
                 }
                 Input::Resize(w, h) => pending_resize = Some((w, h, Instant::now())),
@@ -471,6 +572,23 @@ mod tests {
             Some(("koi-pond", LABEL_SHOWN + HELP_FADING)),
         );
         assert_eq!(frame.drawn(), 0);
+    }
+
+    #[test]
+    fn the_timer_never_changes_scenes_faster_than_the_floor_and_always_moves() {
+        let names = vec!["sea".to_string(), "rain".to_string(), "snow".to_string()];
+        let auto = Auto::new(Rotation::Fixed, Duration::from_millis(10), names, "rain");
+        assert_eq!(auto.every, MIN_EVERY);
+        assert_eq!(
+            auto.rotation,
+            Rotation::Cycle,
+            "a timer that never moves does nothing"
+        );
+        assert_eq!(
+            auto.lineup.current(),
+            "rain",
+            "it starts on the scene asked for"
+        );
     }
 
     #[test]

@@ -23,6 +23,11 @@ pub const FAIL_SCENE_ENV: &str = "ZACESS_FAIL_SCENE";
 pub const MOTION_ENV: &str = "ZACESS_MOTION";
 /// The environment variable that turns notifications on or off.
 pub const NOTIFY_ENV: &str = "ZACESS_NOTIFY";
+/// Turns the ambient sound on or off, overriding the config file.
+pub const AMBIENT_ENV: &str = "ZACESS_AMBIENT";
+/// The ambient sound's volume when nothing sets it: well under the tones, so a pass or a fail is
+/// always heard over it.
+pub const AMBIENT_DEFAULT_VOLUME: u8 = 20;
 
 /// A value in the file.
 #[derive(Clone, Debug, PartialEq)]
@@ -341,12 +346,16 @@ pub struct Config {
     pub volume: Option<u8>,
     pub quiet_hours: Option<QuietHours>,
     /// Per event switches, in the order of `Tone::ALL`.
-    pub events: [Option<bool>; 6],
+    pub events: [Option<bool>; Tone::ALL.len()],
     pub notify: Option<bool>,
+    pub ambient: Option<bool>,
+    pub ambient_volume: Option<u8>,
+    /// Seconds a followed command has to run for before its result counts.
+    pub follow_min_seconds: Option<f64>,
 }
 
 /// Every key the file may hold.
-pub const KEYS: [&str; 20] = [
+pub const KEYS: [&str; 24] = [
     "scenes.theme",
     "scenes.pass",
     "scenes.fail",
@@ -366,7 +375,11 @@ pub const KEYS: [&str; 20] = [
     "sound.events.recovered",
     "sound.events.still_failing",
     "sound.events.warnings",
+    "sound.events.typo",
     "notifications.enabled",
+    "ambient.enabled",
+    "ambient.volume",
+    "follow.min_seconds",
 ];
 
 fn want_string(key: &str, value: &Value, line: usize) -> Result<String, String> {
@@ -496,6 +509,33 @@ impl Config {
                     };
                 }
                 "notifications.enabled" => config.notify = Some(want_bool(key, value, line)?),
+                "ambient.enabled" => config.ambient = Some(want_bool(key, value, line)?),
+                "ambient.volume" => match value {
+                    Value::Integer(n) if (0..=100).contains(n) => {
+                        config.ambient_volume = Some(*n as u8)
+                    }
+                    _ => {
+                        return Err(format!(
+                            "line {line}: ambient volume should be a whole number from 0 to 100"
+                        ));
+                    }
+                },
+                "follow.min_seconds" => {
+                    let seconds = match value {
+                        Value::Integer(n) => *n as f64,
+                        Value::Float(f) => *f,
+                        other => {
+                            return Err(format!(
+                                "line {line}: min_seconds should be a number of seconds, not {}",
+                                other.kind()
+                            ));
+                        }
+                    };
+                    if seconds < 0.0 || !seconds.is_finite() {
+                        return Err(format!("line {line}: min_seconds cannot be below 0"));
+                    }
+                    config.follow_min_seconds = Some(seconds);
+                }
                 _ => {
                     let event = key
                         .strip_prefix("sound.events.")
@@ -581,6 +621,8 @@ pub struct Flags {
     pub notify: Option<bool>,
     pub no_sound: bool,
     pub volume: Option<u8>,
+    pub ambient: Option<bool>,
+    pub ambient_volume: Option<u8>,
 }
 
 /// Every setting after the flags, the variables, the file and the defaults are combined.
@@ -604,6 +646,9 @@ pub struct Resolved {
     pub quiet_hours: Option<QuietHours>,
     pub events: Vec<Tone>,
     pub notify: bool,
+    pub ambient: bool,
+    pub ambient_volume: u8,
+    pub follow_min_seconds: f64,
 }
 
 fn env_bool(value: Option<&str>) -> Option<bool> {
@@ -694,6 +739,14 @@ pub fn resolve(
         (None, None) => config.notify.unwrap_or(false),
     };
 
+    let ambient = match (flags.ambient, var(AMBIENT_ENV)) {
+        (Some(on), _) => on,
+        (None, Some(text)) => env_bool(Some(&text)).ok_or_else(|| {
+            format!("{AMBIENT_ENV} is \"{text}\"; use 1 or 0, true or false, on or off.")
+        })?,
+        (None, None) => config.ambient.unwrap_or(false),
+    };
+
     let events = Tone::ALL
         .iter()
         .zip(&config.events)
@@ -718,6 +771,13 @@ pub fn resolve(
         quiet_hours: config.quiet_hours,
         events,
         notify,
+        // sound off turns the ambient sound off too, so one switch silences everything
+        ambient: ambient && sound_on,
+        ambient_volume: flags
+            .ambient_volume
+            .or(config.ambient_volume)
+            .unwrap_or(AMBIENT_DEFAULT_VOLUME),
+        follow_min_seconds: config.follow_min_seconds.unwrap_or(0.0),
     })
 }
 
@@ -746,7 +806,9 @@ pub fn starter() -> String {
 
 # How the scene changes: fixed keeps the first scene of the list, cycle moves through the list
 # and shuffle picks at random. The scene changes on each new result and, when interval is above
-# 0, every that many minutes while the result stays the same.
+# 0, every that many minutes while the result stays the same. A scene run on its own with no
+# name moves through the pass list the same way, so shuffle and an interval turn it into a
+# slideshow.
 # rotation = "fixed"
 # interval = 0
 
@@ -784,14 +846,28 @@ pub fn starter() -> String {
 # recovered = true
 # still_failing = false
 # warnings = true
+# typo = true
 
 [notifications]
 # A desktop notification when the build changes between passing and failing, which a screen
 # reader can announce. Off unless turned on here, with --notify or with ZACESS_NOTIFY=1.
 # enabled = false
+
+[ambient]
+# A quiet background sound that suits the scene: water, rain, wind, fire or a night meadow. It
+# plays under the tones and stops for a moment while one plays. a turns it on or off and [ and ]
+# change its volume while a scene runs. Sound off and quiet hours silence it too.
+# enabled = false
+# volume = {ambient_volume}
+
+[follow]
+# zacess-scenes follow shows how each command in a shell ended. A command that finishes faster
+# than this many seconds is not counted; 0 counts every command, typos included.
+# min_seconds = 0
 "#,
         sets = sets.join(", "),
         volume = sound::DEFAULT_VOLUME,
+        ambient_volume = AMBIENT_DEFAULT_VOLUME,
     )
 }
 

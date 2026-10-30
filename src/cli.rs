@@ -8,7 +8,7 @@ use crate::config::{self, Flags};
 use crate::scene::Level;
 use crate::scenes::SCENES;
 use crate::sound::{self, SoundSet};
-use crate::watch::JOBS;
+use crate::watch::{JOBS, follow};
 
 pub const DEFAULT_SCENE: &str = "sea";
 pub const DEFAULT_FPS: u32 = 20;
@@ -28,6 +28,13 @@ pub enum Command {
     ListThemes,
     Watch(WatchOptions),
     WatchHelp,
+    /// `follow`: the results of the commands in a shell.
+    Follow(WatchOptions),
+    FollowHelp,
+    /// `follow init <shell>`: print the shell hook.
+    FollowInit {
+        shell: String,
+    },
     /// `list`: every scene and sound set.
     List,
     /// `config init`, refusing to replace a file unless forced.
@@ -99,6 +106,14 @@ impl Default for SnapshotOptions {
 pub struct WatchOptions {
     /// The bacon job: `check`, `check-all`, `clippy` or `test`.
     pub job: String,
+    /// A job was named, so a Rust project uses bacon even when a command could be found.
+    pub job_given: bool,
+    /// The command to run on each change instead of bacon or the detected one.
+    pub command: Option<String>,
+    /// The followed shell's channel, instead of the tmux session or the default.
+    pub channel: Option<String>,
+    /// Followed commands quicker than this many seconds are left out.
+    pub min_seconds: Option<f64>,
     pub fps: u32,
     pub colour_depth: Option<ColourDepth>,
     /// The theme, scenes, sounds, motion and notification flags, combined later with the
@@ -110,6 +125,10 @@ impl Default for WatchOptions {
     fn default() -> Self {
         Self {
             job: JOBS[0].to_string(),
+            job_given: false,
+            command: None,
+            channel: None,
+            min_seconds: None,
             fps: DEFAULT_FPS,
             colour_depth: None,
             flags: Flags::default(),
@@ -137,6 +156,12 @@ pub struct Options {
     pub size: Option<(usize, usize)>,
     /// The colour depth asked for with `--colour`, otherwise detected from the terminal.
     pub colour_depth: Option<ColourDepth>,
+    /// Move to another scene on a timer, at random.
+    pub shuffle: bool,
+    /// Minutes between scenes, which also turns moving on.
+    pub every_minutes: Option<f64>,
+    pub ambient: Option<bool>,
+    pub ambient_volume: Option<u8>,
 }
 
 impl Default for Options {
@@ -154,6 +179,10 @@ impl Default for Options {
             frames: DEFAULT_FRAMES,
             size: None,
             colour_depth: None,
+            shuffle: false,
+            every_minutes: None,
+            ambient: None,
+            ambient_volume: None,
         }
     }
 }
@@ -197,12 +226,14 @@ Calm animated scenes for the terminal in the Zacess themes.\n\nThe original scen
     text.push_str(&format!(
         "\nYour own Lua scenes in the scenes folder beside the config file work too. The default\n\
 scene is {DEFAULT_SCENE}.\n\nCommands:\n\
-  watch [job]               Show the state of a Rust build as a scene (watch --help)\n\
+  watch [job]               Show how a project's build or tests stand, in any language\n\
+                            (watch --help)\n\
+  follow                    Show how each command in a shell ended (follow --help)\n\
   list                      Every scene (pass, fail or general) and the sound sets\n\
   config init [--force]     Write a fully commented config file\n\
   config path               Print where the config file is\n\
   sounds play <set> [event] Play a sound set's tone (event: pass, fail, tick, recovered,\n\
-                            still_failing or warnings; pass by default)\n\
+                            still_failing, warnings or typo; pass by default)\n\
   scene new <name>          Write a commented starter Lua scene into the scenes folder\n\
   snapshot <scene>          Draw a scene into an SVG still or JSON frames (snapshot --help)\n\
 \nOptions:\n\
@@ -215,6 +246,12 @@ scene is {DEFAULT_SCENE}.\n\nCommands:\n\
   --slow               Half speed\n\
   --reduced-motion     Fewer and slower movements, no lightning and no flicker\n\
   --duration <minutes> Stop after this many minutes\n\
+  --shuffle            Move to another scene at random every few minutes (5 by default)\n\
+  --every <minutes>    Minutes between scenes; also turns moving on, in list order\n\
+                       without --shuffle\n\
+  --ambient            A quiet background sound that suits the scene\n\
+  --no-ambient         No background sound, whatever the config says\n\
+  --ambient-volume <0-100> The background sound's volume (default 20)\n\
   --colour <depth>     truecolor or 256, when the terminal's colour depth is detected wrongly\n\
   --seed <n>           Seed the random numbers, so a run can be repeated\n\
   --headless           Draw without a terminal and print the last frame\n\
@@ -223,7 +260,10 @@ scene is {DEFAULT_SCENE}.\n\nCommands:\n\
   -h, --help           This help\n\
   -V, --version        The version\n\
 \nKeys while a scene runs: Space pauses and resumes, n shows the next scene and b the one\n\
-before, h shows the help line again and q, Esc or Ctrl+C quits.\n\nThe theme is taken from\n\
+before, a or m turns the background sound on or off, + and - or ] and [ change its volume, h\n\
+shows the help line again and q, Esc or Ctrl+C quits.\n\n\
+With no scene named and rotation set to shuffle or cycle in the config file, the scenes move\n\
+on every interval minutes by themselves.\n\nThe theme is taken from\n\
 --theme, then ZACESS_THEME, then the config file, then the theme state file\n\
 ($XDG_STATE_HOME/zacess/theme), otherwise Zacess Deep Contrast Dark. ZACESS_REDUCED_MOTION=1\n\
 or the system's reduce motion setting also turns reduced motion on. ZACESS_MOTION sets the\n\
@@ -264,11 +304,16 @@ fn parse_size(text: &str) -> Result<(usize, usize), String> {
 pub fn watch_usage() -> String {
     format!(
         "Usage: zacess-scenes watch [job] [options]\n\n\
-Runs bacon in the current Cargo project and shows the state of the build as a scene: a calm\n\
-scene and ALL GOOD while it passes, a serious one and BUILD FAILED with the first errors while\n\
-it fails. A short opening marks a failing build being fixed.\n\n\
-Jobs: {jobs} (default {default}).\n\n\
+Checks the project in the current folder whenever a file changes and shows how it stands as a\n\
+scene: a calm scene and ALL GOOD while it passes, a serious one and FAILED with the first\n\
+errors while it fails. A short opening marks a failure being fixed.\n\n\
+A Rust project runs bacon when it is installed, with the jobs {jobs} (default\n\
+{default}). Any other project runs its own command: npm, pnpm, yarn or bun's check, test,\n\
+build or lint script, pytest or a compile of every Python file, go build and go vet, Maven,\n\
+Gradle, dotnet build, swift build, mix compile, composer test, rake, make or a CMake build.\n\
+--cmd runs any command instead. Its exit code decides pass or fail.\n\n\
 Options:\n\
+  --cmd <command>      Run this command on each change, through the system shell\n\
   --scene <names>      Pass scenes, separated by commas (default waves, then every pass scene)\n\
   --fail-scene <names> Fail scenes, separated by commas (default storm, then every fail scene)\n\
   --sounds <set>       The sound set: {sets} (default bells)\n\
@@ -281,17 +326,62 @@ Options:\n\
   --colour <depth>     truecolor or 256, when the terminal's colour depth is detected wrongly\n\
   --no-sound           No tones (the screen shows every state either way)\n\
   --volume <0-100>     The volume of the tones (default {volume})\n\
+  --ambient            A quiet background sound that suits the scene\n\
+  --no-ambient         No background sound, whatever the config says\n\
+  --ambient-volume <0-100> The background sound's volume (default 20)\n\
   -h, --help           This help\n\
-\nKeys: q quits, 1 to 4 switch to {jobs}, r reruns the job, n shows the next\n\
+\nKeys: q quits, 1 to 4 switch bacon to {jobs}, r reruns, n shows the next\n\
 scene and N or b the one before, m changes the sound set, + and - change the volume, s turns\n\
-sound on or off, p or Space pauses the animation and h shows the keys again.\n\
+sound on or off, a turns the background sound on or off, [ and ] change its volume, p or\n\
+Space pauses the animation and h shows the keys again.\n\
 \nEvery setting can also go in the config file (zacess-scenes config path shows where). A flag\n\
 wins over an environment variable, which wins over the file, which wins over the default. The\n\
 variables are ZACESS_SCENE, ZACESS_FAIL_SCENE, ZACESS_SOUNDS, ZACESS_MOTION, ZACESS_NOTIFY,\n\
-ZACESS_SOUND=0 to turn sound off and ZACESS_VOLUME. Needs bacon, installed with\n\
+ZACESS_SOUND=0 to turn sound off, ZACESS_VOLUME and ZACESS_AMBIENT. bacon is installed with\n\
 cargo install --locked bacon\n",
         jobs = JOBS.join(", "),
         default = JOBS[0],
+        volume = sound::DEFAULT_VOLUME,
+        sets = SoundSet::ALL.map(|s| s.name()).join(", "),
+    )
+}
+
+/// The help text for `follow`.
+pub fn follow_usage() -> String {
+    format!(
+        "Usage: zacess-scenes follow [options]\n       zacess-scenes follow init <shell>\n\n\
+Shows how each command in a shell ended: a calm scene and ALL GOOD after one that worked, a\n\
+serious one and FAILED after one that failed and TYPO with a soft tone after a command that was\n\
+not found. Fixing it plays the recovered tone. Commands stopped with Ctrl+C are left out.\n\n\
+The shell needs a small hook, loaded from its startup file:\n\n\
+  zsh         eval \"$(zacess-scenes follow init zsh)\"\n\
+  bash        eval \"$(zacess-scenes follow init bash)\"\n\
+  fish        zacess-scenes follow init fish | source\n\
+  PowerShell  zacess-scenes follow init powershell | Out-String | Invoke-Expression\n\n\
+The hook and the scene meet on a channel: ZACESS_FOLLOW when it is set, otherwise the tmux\n\
+session, otherwise default. So a scene in one tmux pane follows the shells in the same session.\n\n\
+Options:\n\
+  --channel <name>     Follow this channel instead\n\
+  --min-seconds <n>    Leave out commands quicker than this (default 0, every command counts)\n\
+  --scene <names>      Pass scenes, separated by commas\n\
+  --fail-scene <names> Fail scenes, separated by commas\n\
+  --sounds <set>       The sound set: {sets} (default bells)\n\
+  --motion <level>     calm, standard or lively\n\
+  --notify             A desktop notification when a command fails or is fixed\n\
+  --no-notify          No notifications, whatever the config says\n\
+  --theme <name>       A Zacess theme by name, id or short name\n\
+  --fps <n>            Frames per second, 1 to {MAX_FPS} (default {DEFAULT_FPS})\n\
+  --reduced-motion     Fewer and slower movements and no lightning\n\
+  --colour <depth>     truecolor or 256, when the terminal's colour depth is detected wrongly\n\
+  --no-sound           No tones (the screen shows every state either way)\n\
+  --volume <0-100>     The volume of the tones (default {volume})\n\
+  --ambient            A quiet background sound that suits the scene\n\
+  --no-ambient         No background sound, whatever the config says\n\
+  --ambient-volume <0-100> The background sound's volume (default 20)\n\
+  -h, --help           This help\n\
+\nKeys: q quits, n shows the next scene and N or b the one before, m changes the sound set, +\n\
+and - change the volume, s turns sound on or off, a turns the background sound on or off, [ and\n\
+] change its volume, p or Space pauses the animation and h shows the keys again.\n",
         volume = sound::DEFAULT_VOLUME,
         sets = SoundSet::ALL.map(|s| s.name()).join(", "),
     )
@@ -360,16 +450,75 @@ fn parse_colour(flag: &str, text: &str) -> Result<ColourDepth, String> {
     ColourDepth::parse(text).ok_or_else(|| format!("{flag} wants truecolor or 256, not \"{text}\""))
 }
 
-/// Parses the arguments after `watch`.
-fn parse_watch(args: impl Iterator<Item = String>) -> Result<Command, String> {
+/// Parses a volume flag's value.
+fn parse_volume_flag(flag: &str, text: &str) -> Result<u8, String> {
+    sound::parse_volume(text)
+        .ok_or_else(|| format!("{flag} wants a whole number from 0 to 100, not \"{text}\""))
+}
+
+/// Parses the arguments after `follow`: `init <shell>` or the options, which are the watch
+/// mode's without a job or a command and with a channel.
+fn parse_follow(args: impl Iterator<Item = String>) -> Result<Command, String> {
+    let mut args = args.peekable();
+    if args.peek().map(String::as_str) == Some("init") {
+        args.next();
+        let shell = args
+            .next()
+            .ok_or_else(|| format!("follow init needs a shell: {}", follow::SHELLS.join(", ")))?
+            .to_ascii_lowercase();
+        if follow::hook(&shell).is_none() {
+            return Err(format!(
+                "there is no hook for \"{shell}\". The shells are {}.",
+                follow::SHELLS.join(", ")
+            ));
+        }
+        if let Some(extra) = args.next() {
+            return Err(format!(
+                "follow init takes one shell, not \"{extra}\" as well"
+            ));
+        }
+        return Ok(Command::FollowInit { shell });
+    }
+    parse_watch(args, true)
+}
+
+/// Parses the arguments after `watch` (after `follow` when `follow` is set).
+fn parse_watch(args: impl Iterator<Item = String>, follow: bool) -> Result<Command, String> {
     let mut options = WatchOptions::default();
     let mut job: Option<String> = None;
     let mut args = args;
+    let other = if follow { "follow" } else { "watch" };
     while let Some(arg) = args.next() {
         let (flag, inline) = split_flag(&arg);
         let flags = &mut options.flags;
         match flag.as_str() {
+            "-h" | "--help" if follow => return Ok(Command::FollowHelp),
             "-h" | "--help" => return Ok(Command::WatchHelp),
+            "--cmd" if !follow => {
+                let command = value(&flag, inline, &mut args)?;
+                if command.trim().is_empty() {
+                    return Err("--cmd needs a command, such as --cmd \"make test\"".to_string());
+                }
+                options.command = Some(command);
+            }
+            "--channel" if follow => {
+                options.channel = Some(follow::clean_channel(&value(&flag, inline, &mut args)?))
+            }
+            "--min-seconds" if follow => {
+                let text = value(&flag, inline, &mut args)?;
+                let seconds: f64 = text
+                    .parse()
+                    .ok()
+                    .filter(|s: &f64| s.is_finite() && *s >= 0.0)
+                    .ok_or_else(|| format!("--min-seconds wants seconds from 0, not \"{text}\""))?;
+                options.min_seconds = Some(seconds);
+            }
+            "--ambient" => flags.ambient = Some(true),
+            "--no-ambient" => flags.ambient = Some(false),
+            "--ambient-volume" => {
+                flags.ambient_volume =
+                    Some(parse_volume_flag(&flag, &value(&flag, inline, &mut args)?)?)
+            }
             "--reduced-motion" => flags.reduced_motion = true,
             "--no-sound" => flags.no_sound = true,
             "--notify" => flags.notify = Some(true),
@@ -389,14 +538,16 @@ fn parse_watch(args: impl Iterator<Item = String>) -> Result<Command, String> {
                     Some(parse_colour(&flag, &value(&flag, inline, &mut args)?)?);
             }
             "--volume" => {
-                let text = value(&flag, inline, &mut args)?;
-                flags.volume = Some(sound::parse_volume(&text).ok_or_else(|| {
-                    format!("--volume wants a whole number from 0 to 100, not \"{text}\"")
-                })?);
+                flags.volume = Some(parse_volume_flag(&flag, &value(&flag, inline, &mut args)?)?)
             }
             _ if flag.starts_with('-') => {
                 return Err(format!(
-                    "unknown option {flag}. Run zacess-scenes watch --help for the options."
+                    "unknown option {flag}. Run zacess-scenes {other} --help for the options."
+                ));
+            }
+            _ if follow => {
+                return Err(format!(
+                    "follow takes no job; \"{arg}\" is not an option. Run zacess-scenes follow --help."
                 ));
             }
             _ => {
@@ -418,6 +569,10 @@ fn parse_watch(args: impl Iterator<Item = String>) -> Result<Command, String> {
     }
     if let Some(job) = job {
         options.job = job;
+        options.job_given = true;
+    }
+    if follow {
+        return Ok(Command::Follow(options));
     }
     Ok(Command::Watch(options))
 }
@@ -568,7 +723,11 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, String>
     match args.peek().map(String::as_str) {
         Some("watch") => {
             args.next();
-            return parse_watch(args);
+            return parse_watch(args, false);
+        }
+        Some("follow") => {
+            args.next();
+            return parse_follow(args);
         }
         Some("list") => {
             args.next();
@@ -644,6 +803,23 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, String>
                     Some(parse_colour(&flag, &value(&flag, inline, &mut args)?)?);
             }
             "--size" => options.size = Some(parse_size(&value(&flag, inline, &mut args)?)?),
+            "--shuffle" => options.shuffle = true,
+            "--every" => {
+                let text = value(&flag, inline, &mut args)?;
+                let minutes: f64 = text
+                    .parse()
+                    .map_err(|_| format!("--every wants minutes, not \"{text}\""))?;
+                if minutes <= 0.0 || !minutes.is_finite() {
+                    return Err(format!("--every must be more than 0 minutes, not {text}"));
+                }
+                options.every_minutes = Some(minutes);
+            }
+            "--ambient" => options.ambient = Some(true),
+            "--no-ambient" => options.ambient = Some(false),
+            "--ambient-volume" => {
+                options.ambient_volume =
+                    Some(parse_volume_flag(&flag, &value(&flag, inline, &mut args)?)?)
+            }
             "--scene" => {
                 let name = value(&flag, inline, &mut args)?;
                 set_scene(&mut options, &name)?;
@@ -1010,6 +1186,79 @@ mod tests {
                 .contains("built-in")
         );
         assert!(parse_args(&["scene", "new", "a/b"]).is_err());
+    }
+
+    #[test]
+    fn a_scene_can_shuffle_on_a_timer_with_background_sound() {
+        let options = run(&[
+            "--shuffle",
+            "--every",
+            "3",
+            "--ambient",
+            "--ambient-volume=40",
+        ]);
+        assert!(options.shuffle);
+        assert_eq!(options.every_minutes, Some(3.0));
+        assert_eq!(options.ambient, Some(true));
+        assert_eq!(options.ambient_volume, Some(40));
+        assert_eq!(run(&["--no-ambient"]).ambient, Some(false));
+        assert!(parse_args(&["--every", "0"]).is_err());
+        assert!(parse_args(&["--every", "soon"]).is_err());
+        assert!(parse_args(&["--ambient-volume", "101"]).is_err());
+    }
+
+    #[test]
+    fn watch_takes_any_command() {
+        let options = watch(&["--cmd", "make test"]);
+        assert_eq!(options.command.as_deref(), Some("make test"));
+        assert!(!options.job_given);
+        assert!(watch(&["clippy"]).job_given);
+        assert!(parse_args(&["watch", "--cmd", " "]).is_err());
+        assert!(
+            parse_args(&["watch", "--channel", "x"]).is_err(),
+            "channel is follow's"
+        );
+    }
+
+    #[test]
+    fn follow_takes_its_options_and_prints_hooks() {
+        let Ok(Command::Follow(options)) = parse_args(&[
+            "follow",
+            "--channel",
+            "my work",
+            "--min-seconds",
+            "2.5",
+            "--ambient",
+        ]) else {
+            panic!("follow did not parse");
+        };
+        assert_eq!(options.channel.as_deref(), Some("my_work"));
+        assert_eq!(options.min_seconds, Some(2.5));
+        assert_eq!(options.flags.ambient, Some(true));
+        assert_eq!(parse_args(&["follow", "--help"]), Ok(Command::FollowHelp));
+        for shell in follow::SHELLS {
+            assert_eq!(
+                parse_args(&["follow", "init", shell]),
+                Ok(Command::FollowInit {
+                    shell: shell.to_string()
+                })
+            );
+        }
+        assert!(parse_args(&["follow", "init"]).is_err());
+        assert!(parse_args(&["follow", "init", "tcsh"]).is_err());
+        assert!(
+            parse_args(&["follow", "check"]).is_err(),
+            "follow takes no job"
+        );
+        assert!(
+            parse_args(&["follow", "--cmd", "x"]).is_err(),
+            "cmd is watch's"
+        );
+        assert!(parse_args(&["follow", "--min-seconds", "-1"]).is_err());
+        let help = follow_usage();
+        for word in ["zsh", "bash", "fish", "PowerShell", "TYPO", "--channel"] {
+            assert!(help.contains(word), "{word}");
+        }
     }
 
     #[test]

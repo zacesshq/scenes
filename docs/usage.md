@@ -11,6 +11,8 @@ zacess-scenes campfire              # one scene by name
 zacess-scenes lanterns --motion calm
 zacess-scenes snow --theme cream    # in a named theme
 zacess-scenes aurora --duration 10  # stops on its own after ten minutes
+zacess-scenes --shuffle --every 5   # a different scene every five minutes
+zacess-scenes sea --ambient         # with the sound of the sea underneath
 zacess-scenes list                  # every scene and sound set
 zacess-scenes --list-themes
 ```
@@ -22,6 +24,8 @@ zacess-scenes --list-themes
 | `Space` | Pauses and resumes |
 | `n` | Shows the next scene and names it on the bottom row |
 | `b` or `N` | Shows the scene before |
+| `a` or `m` | Turns the background sound on or off |
+| `+` and `-` (also `]` and `[`) | Raise and lower the background sound's volume by 10 |
 | `h` or `?` | Shows the help line again |
 | `q`, `Esc` or `Ctrl+C` | Quits and gives the terminal back |
 
@@ -33,7 +37,9 @@ line says so.
 
 | Command | Does |
 | --- | --- |
-| `zacess-scenes watch [job]` | Shows the state of a Rust build as a scene. See [watch mode](watch-mode.md) |
+| `zacess-scenes watch [job]` | Shows how a project's build or tests stand as a scene, in any language. See [watch mode](watch-mode.md) |
+| `zacess-scenes follow` | Shows how each command in a shell ended. See [follow mode](follow-mode.md) |
+| `zacess-scenes follow init <shell>` | Prints the hook for `zsh`, `bash`, `fish` or `powershell` |
 | `zacess-scenes list` | Prints every scene (marked pass, fail or general) and the sound sets |
 | `zacess-scenes config init` | Writes a fully commented config file. Add `--force` to replace one |
 | `zacess-scenes config path` | Prints where the config file is |
@@ -54,6 +60,11 @@ line says so.
 | `--slow` | Half speed |
 | `--reduced-motion` | Fewer and slower movements, no lightning and no flicker, at most 12 frames a second |
 | `--duration <minutes>` | Stops after this many minutes, decimals allowed |
+| `--shuffle` | Moves to another scene at random every few minutes, 5 unless `--every` or the config says otherwise |
+| `--every <minutes>` | Minutes between scenes, decimals allowed. On its own it moves through the list in order |
+| `--ambient` | Plays a quiet [background sound](sounds.md#background-sound) that suits the scene |
+| `--no-ambient` | No background sound, whatever the config says |
+| `--ambient-volume <n>` | The background sound's volume from 0 to 100, 20 by default |
 | `--colour <depth>` | `truecolor` or `256`, when the colour depth is detected wrongly. `--color` also works |
 | `--seed <n>` | Seeds the random numbers, so a run can be repeated exactly |
 | `--headless` | Draws without a terminal and prints the last frame as plain text |

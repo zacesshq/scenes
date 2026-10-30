@@ -60,6 +60,13 @@ pub fn interpret(key: KeyEvent) -> Input {
         // n moves on a scene; N and b go back, so the shifted key reads as the reverse
         KeyCode::Char('n') => Input::Key('n'),
         KeyCode::Char('N') | KeyCode::Char('b') | KeyCode::Char('B') => Input::Key('b'),
+        // the ambient sound: a turns it on or off and [ and ] change its volume in every mode
+        KeyCode::Char('a') | KeyCode::Char('A') => Input::Key('a'),
+        KeyCode::Char(c @ ('[' | ']')) => Input::Key(c),
+        // a scene on its own has no tones, so m, + and - work the ambient sound there too
+        KeyCode::Char('m') | KeyCode::Char('M') => Input::Key('m'),
+        KeyCode::Char('+' | '=') => Input::Key('+'),
+        KeyCode::Char('-' | '_') => Input::Key('-'),
         _ => Input::None,
     }
 }

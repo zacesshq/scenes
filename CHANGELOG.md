@@ -6,9 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Added
+
+- Watch mode for every language. Outside a Rust project with bacon, `zacess-scenes watch` finds the project's own check and runs it on each change: a Node project's `check`, `test`, `build` or `lint` script (with pnpm, yarn or bun when their lockfile is there), pytest or a compile of every Python file, `go build` and `go vet`, Maven, Gradle, `dotnet build`, `swift build`, `mix compile`, `composer test`, `rake`, `make` or a CMake build. `--cmd` runs any other command. Its exit code decides pass or fail and the lines that read as errors are shown, with their file and line where given.
+- Follow mode. `zacess-scenes follow` shows how each command in a shell ended, in any language and with any tool, through a one-line hook for zsh, bash, fish and PowerShell printed by `zacess-scenes follow init <shell>`. A scene follows the shells in its own tmux session unless a channel is named with `ZACESS_FOLLOW` or `--channel`. A command that was not found shows TYPO with a soft tone of its own and the next command that works plays the recovered tone. Commands stopped with `Ctrl+C` are left out and `min_seconds` under `[follow]` can leave out quick ones.
+- A slideshow for a scene run on its own. `--shuffle` moves to another scene at random every five minutes and `--every <minutes>` sets the time. With `rotation` and `interval` in the config, a scene run with no name does the same through the `pass` list.
+- Background sound. `--ambient` or `enabled = true` under `[ambient]` plays a quiet loop that suits the scene: water, rain, wind, fire or a night meadow. It plays at 20 out of 100 by default, steps aside while a tone plays, pauses with the scene and keeps to quiet hours. `a` turns it on or off and `[` and `]` change its volume.
+- The `typo` sound event, on by default.
+
 ### Changed
 
+- The watch mode's failure banner reads FAILED for any command other than bacon, which keeps BUILD FAILED. The warning count shows only with bacon, the one source that reports warnings.
 - A release now tells zacess.com to rebuild. Once every platform's files are attached, the release workflow sends a `scenes-release` repository dispatch naming the tag to `zacesshq/website`, so the site no longer waits for its daily deploy.
+
+### Fixed
+
+- Two of the watch mode's key hints were one or two columns wider than the narrowest terminal they were shown on and were cut short there.
 
 ## [0.4.0] - 2026-10-29
 
