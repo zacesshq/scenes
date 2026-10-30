@@ -22,7 +22,7 @@ theme = "deep-dark"
 pass = ["waves", "koi-pond", "lanterns", "city-night", "my-lantern"]
 fail = ["storm", "flood", "fog"]
 rotation = "cycle"      # fixed, cycle or shuffle
-interval = 15           # minutes; 0 changes only on a new result
+interval = 15           # minutes; 0 changes only on a new result (also a scene run on its own)
 motion = "standard"     # calm, standard or lively
 reduced_motion = false
 captions = true
@@ -41,10 +41,22 @@ tick = false
 recovered = true
 still_failing = false
 warnings = true
+typo = true             # a command a followed shell could not find
 
 [notifications]
 enabled = true
+
+[ambient]
+enabled = true          # a quiet background sound that suits the scene
+volume = 20
+
+[follow]
+min_seconds = 0         # leave out followed commands quicker than this
 ```
+
+With `rotation` set to `cycle` or `shuffle` and an `interval` above 0, a scene run on its own with
+no name moves through the `pass` list by itself, which makes a slideshow. Without a `pass` list it
+moves through every pass and general scene.
 
 The file is read by a small parser of our own for the part of TOML it needs: tables, keys,
 strings, numbers, booleans and lists, with comments. That keeps the program to the dependencies it

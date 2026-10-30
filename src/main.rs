@@ -2,14 +2,17 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 use std::time::Duration;
 
+use zacess_scenes::ambient::Ambient;
 use zacess_scenes::catalogue::Catalogue;
 use zacess_scenes::cli::{self, Command};
 use zacess_scenes::colour::ColourDepth;
+use zacess_scenes::config::Rotation;
 use zacess_scenes::config::{self, Config, Flags};
 use zacess_scenes::rng::Rng;
 use zacess_scenes::scene::Motion;
 use zacess_scenes::sound::{self, SoundSet, Tone};
 use zacess_scenes::terminal::{self, Terminal};
+use zacess_scenes::watch::{How, follow, runner};
 use zacess_scenes::{VERSION, app, glyphs, lua, motion, snapshot, theme, watch};
 
 fn main() -> ExitCode {
@@ -25,6 +28,9 @@ fn main() -> ExitCode {
 }
 
 const BROKEN_PIPE: &str = "broken pipe";
+
+/// Minutes between scenes with --shuffle when nothing else sets them.
+const DEFAULT_EVERY: f64 = 5.0;
 
 /// Writes text to standard output, treating a closed pipe as the reader having seen enough.
 fn emit(text: &str) -> Result<(), String> {
@@ -175,7 +181,12 @@ fn run() -> Result<(), String> {
         Command::WatchHelp => return emit(&cli::watch_usage()),
         Command::SnapshotHelp => return emit(&cli::snapshot_usage()),
         Command::Snapshot(options) => return run_snapshot(options),
-        Command::Watch(options) => return run_watch(options),
+        Command::Watch(options) => return run_watch(options, false),
+        Command::FollowHelp => return emit(&cli::follow_usage()),
+        Command::FollowInit { shell } => {
+            return emit(follow::hook(&shell).ok_or("there is no hook for that shell")?);
+        }
+        Command::Follow(options) => return run_watch(options, true),
         Command::Run(options) => options,
     };
 
@@ -184,6 +195,8 @@ fn run() -> Result<(), String> {
         theme: options.theme.clone(),
         motion: options.motion,
         reduced_motion: options.reduced_motion,
+        ambient: options.ambient,
+        ambient_volume: options.ambient_volume,
         ..Flags::default()
     };
     let resolved = config::resolve(&flags, env, &config)?;
@@ -260,11 +273,48 @@ fn run() -> Result<(), String> {
         background: theme.background,
         floor: theme.floor(),
     });
+    // the timer runs when a flag asks for it (from the config only when no scene was named)
+    let from_config =
+        options.scene.is_none() && resolved.rotation != Rotation::Fixed && resolved.interval > 0.0;
+    let auto = if options.shuffle || options.every_minutes.is_some() || from_config {
+        // --every on its own goes through the list in order, as its help says; the config's
+        // rotation applies only when the timer comes from the config
+        let rotation = if options.shuffle {
+            Rotation::Shuffle
+        } else if options.every_minutes.is_some() {
+            Rotation::Cycle
+        } else {
+            resolved.rotation
+        };
+        let minutes = options
+            .every_minutes
+            .or((resolved.interval > 0.0).then_some(resolved.interval))
+            .unwrap_or(DEFAULT_EVERY);
+        let pool = match resolved.pass.as_ref() {
+            Some(list) => {
+                catalogue.check_list(list, true, "the pass scene list")?;
+                list.clone()
+            }
+            None => catalogue.names_for(true),
+        };
+        Some(app::Auto::new(
+            rotation,
+            Duration::from_secs_f64(minutes * 60.0),
+            pool,
+            &wanted,
+        ))
+    } else {
+        None
+    };
+    let ambient = Ambient::new(resolved.ambient, resolved.ambient_volume)
+        .with_quiet_hours(resolved.quiet_hours);
     let mut playlist = app::Playlist {
         catalogue: &mut catalogue,
         names,
         index,
         motion: scene_motion,
+        auto,
+        ambient: ambient.available().then_some(ambient),
     };
     let result = app::run(&mut playlist, theme, &settings, &mut rng, &mut terminal);
     drop(terminal);
@@ -399,7 +449,65 @@ fn scene_list(
     Ok(all)
 }
 
-fn run_watch(options: cli::WatchOptions) -> Result<(), String> {
+/// Where the watch mode's results come from and what to call them: a command named with
+/// `--cmd`, bacon in a Rust project (when it is installed or a job was named), otherwise the
+/// project's own command.
+fn watch_source(
+    options: &cli::WatchOptions,
+    here: &std::path::Path,
+) -> Result<(How, std::path::PathBuf, String, String), String> {
+    let folder_name = |dir: &std::path::Path| {
+        dir.file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "project".to_string())
+    };
+    if let Some(command) = &options.command {
+        let dir = runner::detect(here).map_or_else(|| here.to_path_buf(), |d| d.dir);
+        return Ok((
+            How::Command(command.clone()),
+            dir.clone(),
+            folder_name(&dir),
+            command.clone(),
+        ));
+    }
+    let detected = runner::detect(here);
+    let cargo = watch::find_project(here);
+    // bacon is used for the nearest project only when that project is the Rust one
+    let rust_nearest = match (&cargo, &detected) {
+        (Some(cargo), Some(found)) => found.dir == *cargo,
+        (Some(_), None) => true,
+        _ => false,
+    };
+    if rust_nearest {
+        let cargo = cargo.expect("checked above");
+        match sound::find_program("bacon") {
+            Some(bacon) => {
+                return Ok((
+                    How::Bacon(bacon),
+                    cargo.clone(),
+                    watch::project_name(&cargo),
+                    options.job.clone(),
+                ));
+            }
+            None if options.job_given => return Err(watch::bacon_missing()),
+            None => {}
+        }
+    }
+    let found = detected.ok_or_else(|| runner::not_detected(here))?;
+    let name = if found.kind == "Rust" {
+        watch::project_name(&found.dir)
+    } else {
+        folder_name(&found.dir)
+    };
+    Ok((
+        How::Command(found.command.clone()),
+        found.dir,
+        name,
+        found.command,
+    ))
+}
+
+fn run_watch(options: cli::WatchOptions, following: bool) -> Result<(), String> {
     let config = load_config()?;
     let resolved = config::resolve(&options.flags, env, &config)?;
     let catalogue = load_catalogue();
@@ -407,8 +515,27 @@ fn run_watch(options: cli::WatchOptions) -> Result<(), String> {
     let fail = scene_list(&catalogue, resolved.fail.as_ref(), false)?;
     let here = std::env::current_dir()
         .map_err(|error| format!("could not read the current folder: {error}"))?;
-    let project_dir = watch::find_project(&here).ok_or_else(|| watch::not_a_project(&here))?;
-    let bacon = sound::find_program("bacon").ok_or_else(watch::bacon_missing)?;
+    let (how, project_dir, project, job) = if following {
+        let channel = options
+            .channel
+            .clone()
+            .unwrap_or_else(|| follow::channel(env));
+        let dir = follow::log_dir_from(env).ok_or("there is no home folder to keep a log in")?;
+        let label = if channel == follow::DEFAULT_CHANNEL {
+            "your shell".to_string()
+        } else {
+            format!("the {channel} session")
+        };
+        let how = How::Follow {
+            log: follow::log_path(&dir, &channel),
+            min_seconds: options.min_seconds.unwrap_or(resolved.follow_min_seconds),
+        };
+        // the status bar reads "following | the dev session", so the channel is said once
+        (how, here.clone(), "following".to_string(), label)
+    } else {
+        watch_source(&options, &here)?
+    };
+    let mode = how.mode();
     let theme = pick_theme(&resolved)?;
     let calm = resolved.reduced_motion || motion::system_reduced_motion();
     let colour = !std::env::var_os("NO_COLOR").is_some_and(|v| !v.is_empty());
@@ -419,28 +546,27 @@ fn run_watch(options: cli::WatchOptions) -> Result<(), String> {
         duration: None,
         colour,
     };
-    let project = watch::project_name(&project_dir);
     let report_path = std::env::temp_dir()
         .join(format!("zacess-scenes-watch-{}", std::process::id()))
         .join("report.json");
     let (pass_first, fail_first) = (pass[0].clone(), fail[0].clone());
-    let mut state = watch::Watch::new(project.clone(), options.job.clone()).with_scenes(
-        pass,
-        fail,
-        resolved.rotation,
-        resolved.interval,
-    );
+    let mut state = watch::Watch::new(project.clone(), job.clone())
+        .with_scenes(pass, fail, resolved.rotation, resolved.interval)
+        .with_mode(mode);
     state.captions = resolved.captions;
     state.banner = resolved.banner;
     let sound = sound::Sound::new(resolved.sound, resolved.volume)
         .with_set(resolved.sound_set)
         .with_events(resolved.events.clone())
         .with_quiet_hours(resolved.quiet_hours);
+    let ambient = Ambient::new(resolved.ambient, resolved.ambient_volume)
+        .with_quiet_hours(resolved.quiet_hours);
     let mut context = watch::Context {
         theme,
         settings,
         motion: Motion::new(calm, resolved.motion),
-        bacon,
+        how,
+        ambient,
         project_dir,
         report_path: report_path.clone(),
         sound,
@@ -449,12 +575,21 @@ fn run_watch(options: cli::WatchOptions) -> Result<(), String> {
     };
     let mut rng = Rng::from_time();
 
+    let doing = match mode {
+        watch::Mode::Bacon => format!("watching {project} with bacon, running the {job} job"),
+        watch::Mode::Command => format!("watching {project}, running {job} on each change"),
+        watch::Mode::Follow => format!("following {job}, where every command counts"),
+    };
+    let keys = match mode {
+        watch::Mode::Bacon => "q quits, 1 to 4 switch the job, r reruns, ",
+        watch::Mode::Command => "q quits, r reruns, ",
+        watch::Mode::Follow => "q quits, ",
+    };
     let intro = format!(
-        "Zacess Scenes is watching {project} with bacon, running the {} job in {}{}, showing \
-         {pass_first} while it passes and {fail_first} while it fails, with the {} sounds{}. q \
-         quits, 1 to 4 switch the job, r reruns, n and b change the scene, m the sounds, + and - \
-         the volume, s turns sound on or off and p pauses the animation.",
-        options.job,
+        "Zacess Scenes is {doing} in {}{}, showing {pass_first} while it passes and {fail_first} \
+         while it fails, with the {} sounds{}. {keys}n and b change the scene, m the sounds, + \
+         and - the volume, s turns sound on or off, a the background sound and p pauses the \
+         animation.",
         theme.name,
         if calm { " with reduced motion" } else { "" },
         resolved.sound_set.name(),

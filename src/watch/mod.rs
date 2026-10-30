@@ -1,9 +1,14 @@
-//! The watch mode: bacon runs a job in the current Cargo project and the screen shows how the
-//! build stands, a calm scene while it passes and a serious one while it fails, with a status bar,
-//! an optional tone and an optional desktop notification on each change. Every tone and
-//! notification has the same state on screen, so neither sound nor colour is ever the only signal.
+//! The watch mode: a project's check runs and the screen shows how it stands, a calm scene while
+//! it passes and a serious one while it fails, with a status bar, an optional tone and an
+//! optional desktop notification on each change. Every tone and notification has the same state
+//! on screen, so neither sound nor colour is ever the only signal.
+//!
+//! The results come from one of three sources: bacon in a Rust project, the project's own
+//! command in any other language or a shell being followed, where every command counts.
 
 pub mod bacon;
+pub mod follow;
+pub mod runner;
 pub mod transition;
 pub mod view;
 
@@ -11,6 +16,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
+use crate::ambient::Ambient;
 use crate::app::{HELP_FADING, HELP_SHOWN, RESIZE_SETTLE, Settings};
 use crate::catalogue::Catalogue;
 use crate::config::Rotation;
@@ -24,7 +30,56 @@ use crate::terminal::{Input, Terminal};
 use crate::theme::ThemeData;
 
 use self::bacon::{Bacon, Event};
+use self::follow::Follow;
+use self::runner::Runner;
 use self::view::{Phase, View};
+
+/// Where the results come from.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+pub enum Mode {
+    /// bacon running one of its jobs in a Rust project.
+    #[default]
+    Bacon,
+    /// The project's own command, run again whenever its files change.
+    Command,
+    /// Each command that finishes in a followed shell.
+    Follow,
+}
+
+/// How to start the source of results.
+#[derive(Clone, Debug)]
+pub enum How {
+    Bacon(PathBuf),
+    Command(String),
+    Follow { log: PathBuf, min_seconds: f64 },
+}
+
+impl How {
+    pub fn mode(&self) -> Mode {
+        match self {
+            How::Bacon(_) => Mode::Bacon,
+            How::Command(_) => Mode::Command,
+            How::Follow { .. } => Mode::Follow,
+        }
+    }
+}
+
+/// A running source of results.
+pub enum Source {
+    Bacon(Bacon),
+    Command(Runner),
+    Follow(Follow),
+}
+
+impl Source {
+    pub fn poll(&mut self) -> Vec<Event> {
+        match self {
+            Source::Bacon(bacon) => bacon.poll(),
+            Source::Command(runner) => runner.poll(),
+            Source::Follow(follow) => follow.poll(),
+        }
+    }
+}
 
 /// The jobs the watch mode runs, in the order the number keys pick them.
 pub const JOBS: [&str; 4] = ["check", "check-all", "clippy", "test"];
@@ -223,6 +278,7 @@ impl Lineup {
 pub struct Watch {
     pub project: String,
     pub job: String,
+    pub mode: Mode,
     pub phase: Phase,
     pub running: bool,
     pub report: Option<Report>,
@@ -256,6 +312,7 @@ impl Watch {
         Self {
             project,
             job,
+            mode: Mode::Bacon,
             phase: Phase::Waiting,
             running: true,
             report: None,
@@ -294,6 +351,21 @@ impl Watch {
         self
     }
 
+    /// Where the results come from. A followed shell has nothing running until a command
+    /// finishes.
+    pub fn with_mode(mut self, mode: Mode) -> Self {
+        self.mode = mode;
+        self.running = mode != Mode::Follow;
+        self
+    }
+
+    /// Whether the latest result is a command that was not found, outside bacon.
+    pub fn typo(&self) -> bool {
+        self.mode == Mode::Follow
+            && self.phase == Phase::Failing
+            && self.report.as_ref().is_some_and(follow::is_typo)
+    }
+
     pub fn with_seed(mut self, seed: u64) -> Self {
         self.rng = Rng::new(seed);
         self
@@ -321,11 +393,17 @@ impl Watch {
                     Phase::Passing
                 };
                 let new_warnings = report.warnings > warnings_before;
+                let typo = self.mode == Mode::Follow && follow::is_typo(&report);
                 self.report = Some(report);
                 self.running = false;
                 self.finished_at = Some(now);
                 self.hook_caption = None;
-                let tone = tone_for(previous, self.phase, self.asked, new_warnings);
+                // a mistyped command gets its own soft tone each time, never the fail phrase
+                let tone = if typo {
+                    Some(Tone::Typo)
+                } else {
+                    tone_for(previous, self.phase, self.asked, new_warnings)
+                };
                 self.asked = false;
                 if previous != self.phase {
                     match self.phase {
@@ -489,21 +567,37 @@ pub struct Context<'a> {
     pub theme: &'a ThemeData,
     pub settings: Settings,
     pub motion: Motion,
-    pub bacon: PathBuf,
+    pub how: How,
     pub project_dir: PathBuf,
     pub report_path: PathBuf,
     pub sound: Sound,
+    pub ambient: Ambient,
     pub catalogue: Catalogue,
     pub notify: bool,
 }
 
-fn start_bacon(context: &Context, job: &str) -> io::Result<Bacon> {
-    Bacon::start(
-        &context.bacon,
-        &context.project_dir,
-        job,
-        &context.report_path,
-    )
+fn start_source(context: &Context, job: &str) -> io::Result<Source> {
+    Ok(match &context.how {
+        How::Bacon(program) => Source::Bacon(Bacon::start(
+            program,
+            &context.project_dir,
+            job,
+            &context.report_path,
+        )?),
+        How::Command(command) => Source::Command(Runner::start(&context.project_dir, command)?),
+        How::Follow { log, min_seconds } => Source::Follow(Follow::start(log, *min_seconds)?),
+    })
+}
+
+/// How long a tone takes, so the ambient sound can make room for it.
+const TONE_ROOM: Duration = Duration::from_millis(1600);
+
+/// Plays an event's tone, with the ambient sound stepping aside while it does.
+fn sound_tone(context: &mut Context, tone: Tone) {
+    if context.sound.would_play(tone) {
+        context.ambient.duck(TONE_ROOM);
+    }
+    context.sound.play(tone);
 }
 
 /// A scene by name (or the built-in scene of its kind when a user scene fails to start) with the
@@ -535,7 +629,8 @@ pub fn run(
     terminal: &mut Terminal,
 ) -> io::Result<()> {
     let motion = context.motion;
-    let mut bacon = Some(start_bacon(context, &watch.job)?);
+    let mode = context.how.mode();
+    let mut source = Some(start_source(context, &watch.job)?);
     let (mut width, mut height) = terminal.size()?;
     let (mut scene, mut current, mut scene_error) = build(
         &context.catalogue,
@@ -613,6 +708,9 @@ pub fn run(
             if paused {
                 notes.push("paused".to_string());
             }
+            context.ambient.set_scene(&current);
+            context.ambient.pause(paused);
+            context.ambient.tick();
             if !context.sound.enabled() {
                 notes.push("sound off".to_string());
             } else if !context.sound.available() {
@@ -628,6 +726,8 @@ pub fn run(
             let view = View {
                 project: &watch.project,
                 job: &watch.job,
+                mode,
+                typo: watch.typo(),
                 phase: watch.phase,
                 running: watch.running,
                 report: watch.report.as_ref(),
@@ -667,6 +767,19 @@ pub fn run(
                 Input::Pause | Input::Key('p') => paused = !paused,
                 Input::Help => hint_age = Some(0.0),
                 Input::Key('s') => context.sound.toggle(),
+                Input::Key('a') => {
+                    context.ambient.toggle();
+                    let state = if context.ambient.enabled() {
+                        "on"
+                    } else {
+                        "off"
+                    };
+                    notice = Some((format!("ambient {state}"), Instant::now()));
+                }
+                Input::Key(key @ ('[' | ']')) => {
+                    let volume = context.ambient.change_volume(key == ']');
+                    notice = Some((format!("ambient volume {volume}"), Instant::now()));
+                }
                 Input::Key(key @ ('n' | 'N' | 'b')) => {
                     let now = Instant::now();
                     if last_scene_key.is_none_or(|at| now.duration_since(at) >= SCENE_DEBOUNCE) {
@@ -685,26 +798,35 @@ pub fn run(
                         format!("sounds {} \u{b7} scene {current}", set.name()),
                         Instant::now(),
                     ));
-                    context.sound.play(Tone::Pass);
+                    sound_tone(context, Tone::Pass);
                 }
                 Input::Key(key @ ('+' | '-')) => {
                     let volume = context.sound.change_volume(key == '+');
                     notice = Some((format!("volume {volume}"), Instant::now()));
-                    context.sound.play(Tone::Tick);
+                    sound_tone(context, Tone::Tick);
                 }
-                Input::Key('r') => {
+                // a followed shell runs nothing itself, so there is nothing to rerun
+                Input::Key('r') if mode != Mode::Follow => {
                     let job = watch.job.clone();
-                    // the old bacon is stopped before the new one starts, so they never share
-                    // the report file
-                    drop(bacon.take());
-                    watch.restart(&job);
-                    bacon = Some(start_bacon(context, &job)?);
+                    match source.as_mut() {
+                        Some(Source::Command(runner)) => {
+                            watch.restart(&job);
+                            runner.rerun();
+                        }
+                        _ => {
+                            // the old source is stopped before the new one starts, so two
+                            // bacons never share the report file
+                            drop(source.take());
+                            watch.restart(&job);
+                            source = Some(start_source(context, &job)?);
+                        }
+                    }
                 }
-                Input::Key(digit @ '1'..='4') => {
+                Input::Key(digit @ '1'..='4') if mode == Mode::Bacon => {
                     let job = JOBS[digit as usize - '1' as usize];
-                    drop(bacon.take());
+                    drop(source.take());
                     watch.restart(job);
-                    bacon = Some(start_bacon(context, job)?);
+                    source = Some(start_source(context, job)?);
                 }
                 Input::Resize(w, h) => pending_resize = Some((w, h, Instant::now())),
                 Input::Key(_) | Input::None => {}
@@ -724,12 +846,12 @@ pub fn run(
 
         if last_report_poll.elapsed() >= REPORT_POLL {
             last_report_poll = Instant::now();
-            let events = bacon.as_mut().map(Bacon::poll).unwrap_or_default();
+            let events = source.as_mut().map(Source::poll).unwrap_or_default();
             for event in events {
                 let exited = matches!(event, Event::Exited(_));
                 let outcome = watch.apply(event, Instant::now());
                 if let Some(tone) = outcome.tone {
-                    context.sound.play(tone);
+                    sound_tone(context, tone);
                 }
                 if let Some(change) = outcome.change.filter(|_| context.notify) {
                     let problems = watch.report.as_ref().map_or(0, |r| r.errors + r.test_fails);
@@ -742,7 +864,7 @@ pub fn run(
                     pending_moment = outcome.moment;
                 }
                 if exited {
-                    bacon = None;
+                    source = None;
                     break;
                 }
             }
@@ -1053,6 +1175,32 @@ mod tests {
         watch.restart("check");
         assert_eq!(watch.phase, Phase::Waiting);
         assert!(watch.message.is_none());
+    }
+
+    #[test]
+    fn only_a_followed_shell_calls_a_missing_command_a_typo() {
+        let missing = Report {
+            errors: 1,
+            exit_code: Some(follow::NOT_FOUND),
+            ..Report::default()
+        };
+        let mut followed =
+            Watch::new("following".into(), "your shell".into()).with_mode(Mode::Follow);
+        assert!(
+            !followed.running,
+            "a followed shell runs nothing until a command finishes"
+        );
+        let outcome = followed.apply(Event::Finished(missing.clone()), Instant::now());
+        assert_eq!(outcome.tone, Some(Tone::Typo));
+        assert!(followed.typo());
+        let fixed = followed.apply(Event::Finished(Report::default()), Instant::now());
+        assert_eq!(fixed.tone, Some(Tone::Recovered));
+
+        // a project command whose tool is missing exits 127 too, but that is a failure to read
+        let mut watched = Watch::new("p".into(), "pnpm test".into()).with_mode(Mode::Command);
+        let outcome = watched.apply(Event::Finished(missing), Instant::now());
+        assert_eq!(outcome.tone, Some(Tone::Fail));
+        assert!(!watched.typo());
     }
 
     #[test]

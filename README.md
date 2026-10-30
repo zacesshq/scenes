@@ -1,7 +1,8 @@
 # Zacess Scenes
 
 Calm animated scenes for the terminal, drawn in the eight [Zacess](https://zacess.com) high contrast
-themes. It is also a build monitor for Rust that shows how a build stands as a scene.
+themes. It is also a build monitor for projects in any language and can follow a shell, showing
+how each command ended as a scene.
 
 | While the build passes | While it fails |
 | --- | --- |
@@ -23,18 +24,23 @@ screen.
 zacess-scenes                       # the sea, in the active theme
 zacess-scenes koi-pond              # one scene by name
 zacess-scenes list                  # every scene and sound set
+zacess-scenes --shuffle --ambient   # a new scene every five minutes, with background sound
 cd my-project && zacess-scenes watch --sounds piano --notify
+zacess-scenes follow                # how each command in this tmux session ended
 ```
 
-While a scene runs `n` shows the next scene, `b` the one before, `Space` pauses and `q` quits.
+While a scene runs `n` shows the next scene, `b` the one before, `a` turns the background sound on
+or off, `Space` pauses and `q` quits. Follow mode needs a one-line hook in the shell:
+`eval "$(zacess-scenes follow init zsh)"` (see [follow mode](docs/follow-mode.md)).
 
 ## Documentation
 
 | Page | Covers |
 | --- | --- |
 | [Using Zacess Scenes](docs/usage.md) | The commands, the keys, every flag and headless rendering |
-| [Watch mode](docs/watch-mode.md) | The build monitor for Rust with bacon: jobs, the status bar, choosing scenes, keys and notifications |
-| [Sound sets](docs/sounds.md) | The eight sound sets, the events and the sound settings |
+| [Watch mode](docs/watch-mode.md) | The build monitor for any language: the command for each project, bacon for Rust, the status bar, choosing scenes, keys and notifications |
+| [Follow mode](docs/follow-mode.md) | Every command in a shell as a result: the hook for zsh, bash, fish and PowerShell, channels and typos |
+| [Sound sets](docs/sounds.md) | The eight sound sets, the events, the background sound and the sound settings |
 | [Configuration](docs/configuration.md) | The `scenes.toml` file with a full example |
 | [Themes](docs/themes.md) | How the theme is picked, the eight themes and colour depth |
 | [Lua scenes](docs/lua.md) | Writing a scene of your own in Lua |

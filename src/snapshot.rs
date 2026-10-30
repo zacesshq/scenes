@@ -384,6 +384,8 @@ impl Shot<'_> {
             let view = View {
                 project: "my-project",
                 job: "check",
+                mode: crate::watch::Mode::Bacon,
+                typo: false,
                 phase: match state {
                     SnapshotState::Pass => Phase::Passing,
                     SnapshotState::Fail => Phase::Failing,

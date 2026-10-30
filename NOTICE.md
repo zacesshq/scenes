@@ -39,7 +39,8 @@ that `zacess-scenes scene new` writes are our own and under this project's MIT l
 
 ## bacon
 
-The watch mode runs [bacon](https://github.com/Canop/bacon) by Canop, which is licensed under the
+In a Rust project the watch mode runs [bacon](https://github.com/Canop/bacon) by Canop when it is
+installed. bacon is licensed under the
 [GNU Affero General Public License 3.0](https://github.com/Canop/bacon/blob/main/LICENSE). bacon is
 a separate program that the person installs themselves with `cargo install --locked bacon`. It is
 not bundled with, linked into or copied into Zacess Scenes. Zacess Scenes starts it as its own

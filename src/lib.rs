@@ -4,6 +4,7 @@
 //! [`frame::Frame`], the frame renders to a string and the terminal layer in [`terminal`] is the
 //! only module that touches a real terminal.
 
+pub mod ambient;
 pub mod app;
 pub mod catalogue;
 pub mod cli;

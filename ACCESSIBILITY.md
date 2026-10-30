@@ -19,11 +19,15 @@ its code and its tests, not what it aims to do.
   on the bottom row for two and a half seconds, then dim and go like the help line. A scene changes
   at most once every 0.4 seconds however fast the key is pressed or held, so the picture is never
   replaced more than three times a second.
-- The watch mode adds `1` to `4` to switch the job, `r` to run it again, `p` to pause the animation,
-  `s` to turn sound on or off, `n` and `b` to change the scene, `m` to change the sound set and `+`
-  and `-` to change the volume (`=` and `_` work too, so Shift is never needed). Its key hint
-  shows, dims and goes in the same way as the help line, above a status bar that stays on screen.
-  A change of scene, sound set or volume is written in the status bar for three seconds.
+- `a` turns the background sound on or off and `[` and `]` change its volume in every mode. A scene
+  run on its own has no tones, so `m`, `+` and `-` work the background sound there too. Each
+  change is written on the bottom row for two and a half seconds.
+- The watch mode adds `1` to `4` to switch bacon's job, `r` to run it again, `p` to pause the
+  animation, `s` to turn sound on or off, `n` and `b` to change the scene, `m` to change the sound
+  set and `+` and `-` to change the volume (`=` and `_` work too, so Shift is never needed). The
+  follow mode has the same keys apart from `1` to `4` and `r`, since it runs nothing itself. Their
+  key hints show, dim and go in the same way as the help line, above a status bar that stays on
+  screen. A change of scene, sound set or volume is written in the status bar for three seconds.
 
 ## Before and after the scene
 
@@ -38,10 +42,11 @@ its code and its tests, not what it aims to do.
   within a second of the signal rather than running on unseen. A `SIGKILL` cannot be caught by any program; after one, `reset` gives the terminal
   back. On Windows, closing the console window ends the console along with the program.
 - `--duration <minutes>` stops the scene on its own, for a screen that should not run forever.
-- The watch mode prints the same kind of line before it starts: the project, the job, the theme,
-  whether reduced motion is on and every key. Without bacon or outside a Cargo project it prints
-  a plain message instead and never takes over the screen. Without bacon the message gives the
-  command that installs it.
+- The watch and follow modes print the same kind of line before they start: the project or the
+  shell followed, the job or command, the theme, whether reduced motion is on and every key. When
+  no project is found the watch mode prints a plain message instead, naming the kinds of project
+  it knows and `--cmd`. It never takes over the screen then. When bacon's job is asked for without
+  bacon the message gives the command that installs it.
 
 ## Motion
 
@@ -103,6 +108,9 @@ Nothing in any scene flashes: no scene changes the whole screen or a large area 
 | watch mode | The key hint | Fades in two steps, over 5.5 seconds, never blinks | `the_hint_shows_then_dims_then_goes` |
 | watch mode | The recovered opening: the pass scene opens out from the middle over the fail scene | Once per fix, over 2 seconds (3.5 under reduced motion, with no sparkles); each cell changes once as the edge passes | `the_opening_never_flashes_and_ends_on_the_new_scene` |
 | every scene | A change of scene with `n` or `b` | At most once every 0.4 seconds | `SCENE_DEBOUNCE` in `src/app.rs` and `src/watch/mod.rs` |
+| every scene | A change of scene on a timer, with `--shuffle`, `--every` or the config's interval | Every few minutes, 5 by default, never more often than every 3 seconds however small the time asked for | `the_timer_never_changes_scenes_faster_than_the_floor_and_always_moves` |
+| watch mode with a command | The change between passing and failing | Once per finished run. Files are looked at every 0.7 seconds and a run starts only once they have been still for 0.3 seconds | `a_run_passes_fails_and_reruns_on_a_change` |
+| follow mode | The change between passing, failing and a typo | Once per command, never more often than every 0.4 seconds. Commands that finish closer together than that show only the latest | `following_reads_only_new_commands_and_skips_interruptions` |
 | Lua scenes | Anything the script draws | A frame that would make a fourth large change in a second is held back; a scene held back more than ten times in ten seconds is stopped | `a_flashing_script_is_damped_then_stopped` |
 | koi-pond | A ripple's ring, which widens in four stages | One stage every 0.6 seconds, every 1.2 under reduced motion | `ripples_widen_slowly_and_tails_sway_slowly` |
 | koi-pond | A koi's tail, spread and then closed | One change every 1.2 seconds; still under reduced motion | `ripples_widen_slowly_and_tails_sway_slowly` |
@@ -183,8 +191,9 @@ their own words. With `NO_COLOR` set, every character is drawn in the terminal's
 
 ## Sound
 
-The scenes make no sound. The watch mode can play six short events in one of eight sound sets:
-`bells`, `marimba`, `kalimba`, `pad`, `chip`, `glass`, `piano` and `rain`.
+A scene on its own is silent unless the background sound is turned on. The watch and follow modes
+can play seven short events in one of eight sound sets: `bells`, `marimba`, `kalimba`, `pad`,
+`chip`, `glass`, `piano` and `rain`.
 
 | Event | When | On by default |
 | --- | --- | --- |
@@ -194,13 +203,15 @@ The scenes make no sound. The watch mode can play six short events in one of eig
 | recovered | A run passes after failing | Yes |
 | warnings | A passing run has more warnings than the last | Yes |
 | still_failing | A run fails again, at 30 percent of the level | No |
+| typo | A followed command was not found, at 60 percent of the level | Yes |
 
 - Sound is never the only signal. Every event has the same state on screen at the same moment: the
   banner, the scene and the status bar show passing, failing or recovered. The status bar shows
   `running` while a rebuild runs and the warning count.
 - Every set plays the same phrase for each event, a rising triad for a pass, a falling fourth for a
-  failure, the triad landing an octave up for a fix and a rising minor third for warnings, so the
-  meaning does not change with the timbre.
+  failure, the triad landing an octave up for a fix, a rising minor third for warnings and two soft
+  low notes a step apart for a typo, so the meaning does not change with the timbre. A typo shows
+  TYPO on screen as well as its tone.
 - Every tone is levelled to the same loudness, measured as the root mean square of its loudest 50
   milliseconds. It is kept under a peak of 70 percent of full scale. `every_set_and_event_is_levelled_to_the_same_loudness`
   holds each tone within a decibel of its level and every set's pass tone within 1.5 decibels of
@@ -216,6 +227,22 @@ The scenes make no sound. The watch mode can play six short events in one of eig
   `tones_start_and_end_in_silence_so_they_never_click` check every set and event.
 - The longest tone, the pad set's recovered phrase, lasts one and a quarter seconds.
 - Without a system player the watch mode stays silent and the status bar says `no sound player`.
+
+### Background sound
+
+- Off unless turned on with `--ambient`, `ZACESS_AMBIENT=1` or `enabled = true` under `[ambient]`.
+  `--no-ambient` or `a` turns it off again.
+- A quiet loop that suits the scene: water, rain, wind, fire or a night meadow. It carries no
+  meaning and nothing depends on hearing it.
+- It plays at 20 out of 100 by default, under the tones' 50. It is also levelled to about a third
+  of the tones' loudness at the same volume. `no_sample_reaches_full_scale_and_it_stays_under_the_tones`
+  checks every loop. `[` and `]` change it in steps of 10 and 0 is silent.
+- It stops for a moment while a tone plays, so a pass, a failure or a typo is always heard over it.
+- It pauses with the scene, keeps to quiet hours and is off whenever sound is turned off with
+  `--no-sound`, `ZACESS_SOUND=0` or the config.
+- Each loop lasts 20 seconds and its end is crossfaded into its start, so it never clicks at the
+  join (`the_loop_joins_without_a_jump`). The player is started again as a loop ends, which leaves
+  a gap of a few milliseconds.
 
 ## Notifications
 
