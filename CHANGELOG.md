@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-30
+
 ### Added
 
 - Watch mode for every language. Outside a Rust project with bacon, `zacess-scenes watch` finds the project's own check and runs it on each change: a Node project's `check`, `test`, `build` or `lint` script (with pnpm, yarn or bun when their lockfile is there), pytest or a compile of every Python file, `go build` and `go vet`, Maven, Gradle, `dotnet build`, `swift build`, `mix compile`, `composer test`, `rake`, `make` or a CMake build. `--cmd` runs any other command. Its exit code decides pass or fail and the lines that read as errors are shown, with their file and line where given.
@@ -104,7 +106,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The README, this changelog, the accessibility statement, the contributing guide, the security policy, the support guide, the code of conduct, a licensing notice for the Zacess mark and the palette, issue forms for a bug, a scene idea and an accessibility problem, a pull request template, CODEOWNERS and Dependabot for the actions and the Cargo dependencies.
 - `docs/scenes.md`, which describes every scene and its reduced motion behaviour.
 
-[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/zacesshq/scenes/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/zacesshq/scenes/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/zacesshq/scenes/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/zacesshq/scenes/compare/v0.1.0...v0.2.0
