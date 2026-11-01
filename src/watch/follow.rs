@@ -178,7 +178,12 @@ impl Follow {
             .open(path)?;
         let mut offset = file.metadata()?.len();
         if offset > MAX_LOG {
-            file.set_len(0)?;
+            // emptied through a handle of its own opened for writing: on Windows an append-only
+            // handle has no write access, so set_len on it fails with Access is denied
+            std::fs::OpenOptions::new()
+                .write(true)
+                .open(path)?
+                .set_len(0)?;
             offset = 0;
         }
         Ok(Self {
@@ -522,6 +527,38 @@ mod tests {
         let mut slow_only = Follow::start(&path, 3.0).unwrap();
         append("1\t4\tslow\n1\t0.5\tquick\n");
         assert!(matches!(&slow_only.poll()[..], [Event::Finished(r)] if r.failed()));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_log_over_the_limit_is_emptied_when_a_follow_starts() {
+        let dir = std::env::temp_dir().join(format!("zacess-follow-big-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let path = log_path(&dir, "big");
+        std::fs::create_dir_all(&dir).unwrap();
+        let line = "0\t0.1\tls\n";
+        let lines = (MAX_LOG as usize / line.len()) + 2;
+        std::fs::write(&path, line.repeat(lines)).unwrap();
+        assert!(std::fs::metadata(&path).unwrap().len() > MAX_LOG);
+        let mut follow =
+            Follow::start(&path, 0.0).expect("a follow starts on a log over the limit");
+        assert_eq!(
+            std::fs::metadata(&path).unwrap().len(),
+            0,
+            "the log is emptied"
+        );
+        {
+            use std::io::Write;
+            let mut f = std::fs::OpenOptions::new()
+                .append(true)
+                .open(&path)
+                .unwrap();
+            f.write_all(b"1\t0.2\tmake\n").unwrap();
+        }
+        assert!(
+            matches!(&follow.poll()[..], [Event::Finished(r)] if r.failed()),
+            "a command written after the emptying is read"
+        );
         let _ = std::fs::remove_dir_all(&dir);
     }
 

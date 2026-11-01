@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+### Fixed
+
+- Follow mode on Windows no longer stops with "watch stopped: Access is denied" once a channel's log passes 256 KB. Emptying the log at the start of a follow now uses a handle opened for writing, since Windows refuses to shorten a file through an append-only one.
+
 ## [0.5.0] - 2026-10-30
 
 ### Added
