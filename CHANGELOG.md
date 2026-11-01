@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-01
+
 ### Fixed
 
 - Follow mode on Windows no longer stops with "watch stopped: Access is denied" once a channel's log passes 256 KB. Emptying the log at the start of a follow now uses a handle opened for writing, since Windows refuses to shorten a file through an append-only one.
@@ -110,7 +112,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The README, this changelog, the accessibility statement, the contributing guide, the security policy, the support guide, the code of conduct, a licensing notice for the Zacess mark and the palette, issue forms for a bug, a scene idea and an accessibility problem, a pull request template, CODEOWNERS and Dependabot for the actions and the Cargo dependencies.
 - `docs/scenes.md`, which describes every scene and its reduced motion behaviour.
 
-[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/zacesshq/scenes/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/zacesshq/scenes/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/zacesshq/scenes/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/zacesshq/scenes/compare/v0.2.0...v0.3.0
