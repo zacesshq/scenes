@@ -1,4 +1,9 @@
-# Zacess Scenes
+<h1>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/scenes-lockup-dark.svg">
+    <img src="assets/scenes-lockup-light.svg" alt="Zacess Scenes" width="400">
+  </picture>
+</h1>
 
 Calm animated scenes for the terminal, drawn in the eight [Zacess](https://zacess.com) high contrast
 themes. It is also a build monitor for projects in any language and can follow a shell, showing
