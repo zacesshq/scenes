@@ -8,7 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Added
 
-- The Zacess Scenes mark in `assets/` in light, dark, automatic and single colour versions, with a light and a dark lockup at the head of the README.
+- The Zacess Scenes mark in `assets/` in light, dark, automatic and single colour versions, with a light and a dark lockup at the head of the README. A dark and a light banner and a 1280 by 640 social preview image sit beside them.
 
 ## [0.6.0] - 2026-11-03
 
