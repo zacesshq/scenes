@@ -143,7 +143,7 @@ body:
     attributes:
       label: Version and system
       description: The output of `zacess-scenes --version`, the operating system and the terminal version.
-      placeholder: zacess-scenes 1.0.0, macOS 26, Ghostty 1.2
+      placeholder: zacess-scenes 1.1.0, macOS 26, Ghostty 1.2
   - type: dropdown
     id: ai-use
     attributes:

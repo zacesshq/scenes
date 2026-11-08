@@ -1,6 +1,6 @@
-# winget default locale manifest for Zacess Scenes 1.0.0.
+# winget default locale manifest for Zacess Scenes 1.1.0.
 PackageIdentifier: Zacess.Scenes
-PackageVersion: 1.0.0
+PackageVersion: 1.1.0
 PackageLocale: en-US
 Publisher: Zacess
 PublisherUrl: https://zacess.com
@@ -16,6 +16,6 @@ Tags:
   - accessibility
   - animation
   - terminal
-ReleaseNotesUrl: https://github.com/zacesshq/scenes/releases/tag/v1.0.0
+ReleaseNotesUrl: https://github.com/zacesshq/scenes/releases/tag/v1.1.0
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

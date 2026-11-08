@@ -65,6 +65,7 @@ line says so.
 | `--ambient` | Plays a quiet [background sound](sounds.md#background-sound) that suits the scene |
 | `--no-ambient` | No background sound, whatever the config says |
 | `--ambient-volume <n>` | The background sound's volume from 0 to 100, 20 by default |
+| `--ambient-sound <name>` | One background sound for every scene, such as `pad` or `birds`. `auto` keeps each scene's own |
 | `--colour <depth>` | `truecolor` or `256`, when the colour depth is detected wrongly. `--color` also works |
 | `--seed <n>` | Seeds the random numbers, so a run can be repeated exactly |
 | `--headless` | Draws without a terminal and prints the last frame as plain text |

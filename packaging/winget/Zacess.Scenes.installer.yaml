@@ -1,15 +1,15 @@
-# winget installer manifest for Zacess Scenes 1.0.0. SHA256_X86_64_PC_WINDOWS_MSVC is the sum from
-# the zip's .sha256 file attached to the v1.0.0 release; packaging/fill-checksums.sh fills it in.
+# winget installer manifest for Zacess Scenes 1.1.0. SHA256_X86_64_PC_WINDOWS_MSVC is the sum from
+# the zip's .sha256 file attached to the v1.1.0 release; packaging/fill-checksums.sh fills it in.
 PackageIdentifier: Zacess.Scenes
-PackageVersion: 1.0.0
+PackageVersion: 1.1.0
 InstallerType: zip
 NestedInstallerType: portable
 NestedInstallerFiles:
-  - RelativeFilePath: zacess-scenes-v1.0.0-x86_64-pc-windows-msvc\zacess-scenes.exe
+  - RelativeFilePath: zacess-scenes-v1.1.0-x86_64-pc-windows-msvc\zacess-scenes.exe
     PortableCommandAlias: zacess-scenes
 Installers:
   - Architecture: x64
-    InstallerUrl: https://github.com/zacesshq/scenes/releases/download/v1.0.0/zacess-scenes-v1.0.0-x86_64-pc-windows-msvc.zip
+    InstallerUrl: https://github.com/zacesshq/scenes/releases/download/v1.1.0/zacess-scenes-v1.1.0-x86_64-pc-windows-msvc.zip
     InstallerSha256: SHA256_X86_64_PC_WINDOWS_MSVC
 ManifestType: installer
 ManifestVersion: 1.6.0

@@ -3,6 +3,7 @@
 
 use std::path::PathBuf;
 
+use crate::ambient::Ambience;
 use crate::colour::ColourDepth;
 use crate::config::{self, Flags};
 use crate::scene::Level;
@@ -48,6 +49,8 @@ pub enum Command {
         set: SoundSet,
         event: Option<sound::Tone>,
     },
+    /// `sounds ambient [sound]`: a little of one background sound or of each.
+    SoundsAmbient(Option<Ambience>),
     /// `scene new <name>`, refusing to replace a file unless forced.
     SceneNew {
         name: String,
@@ -165,6 +168,8 @@ pub struct Options {
     pub every_minutes: Option<f64>,
     pub ambient: Option<bool>,
     pub ambient_volume: Option<u8>,
+    /// One background sound for every scene; `None` inside means each scene's own.
+    pub ambient_sound: Option<Option<Ambience>>,
 }
 
 impl Default for Options {
@@ -186,6 +191,7 @@ impl Default for Options {
             every_minutes: None,
             ambient: None,
             ambient_volume: None,
+            ambient_sound: None,
         }
     }
 }
@@ -235,8 +241,10 @@ scene is {DEFAULT_SCENE}.\n\nCommands:\n\
   list                      Every scene (pass, fail or general) and the sound sets\n\
   config init [--force]     Write a fully commented config file\n\
   config path               Print where the config file is\n\
+  sounds ambient [sound]    Play a little of one background sound or of each\n\
   sounds play <set> [event] Play a sound set's tone (event: pass, fail, tick, recovered,\n\
-                            still_failing, warnings or typo; pass by default)\n\
+                            still_failing, warnings, typo, clean or stopped;\n\
+                            pass by default)\n\
   scene new <name>          Write a commented starter Lua scene into the scenes folder\n\
   snapshot <scene>          Draw a scene into an SVG still or JSON frames (snapshot --help)\n\
 \nOptions:\n\
@@ -255,6 +263,8 @@ scene is {DEFAULT_SCENE}.\n\nCommands:\n\
   --ambient            A quiet background sound that suits the scene\n\
   --no-ambient         No background sound, whatever the config says\n\
   --ambient-volume <0-100> The background sound's volume (default 20)\n\
+  --ambient-sound <name> One background sound for every scene; auto keeps each\n\
+                       scene's own (sounds ambient plays them)\n\
   --colour <depth>     truecolor or 256, when the terminal's colour depth is detected wrongly\n\
   --seed <n>           Seed the random numbers, so a run can be repeated\n\
   --headless           Draw without a terminal and print the last frame\n\
@@ -332,6 +342,8 @@ Options:\n\
   --ambient            A quiet background sound that suits the scene\n\
   --no-ambient         No background sound, whatever the config says\n\
   --ambient-volume <0-100> The background sound's volume (default 20)\n\
+  --ambient-sound <name> One background sound for every scene; auto keeps each\n\
+                       scene's own (sounds ambient plays them)\n\
   -h, --help           This help\n\
 \nKeys: q quits, 1 to 4 switch bacon to {jobs}, r reruns, n shows the next\n\
 scene and N or b the one before, m changes the sound set, + and - change the volume, s turns\n\
@@ -381,6 +393,8 @@ Options:\n\
   --ambient            A quiet background sound that suits the scene\n\
   --no-ambient         No background sound, whatever the config says\n\
   --ambient-volume <0-100> The background sound's volume (default 20)\n\
+  --ambient-sound <name> One background sound for every scene; auto keeps each\n\
+                       scene's own (sounds ambient plays them)\n\
   -h, --help           This help\n\
 \nKeys: q quits, n shows the next scene and N or b the one before, m changes the sound set, +\n\
 and - change the volume, s turns sound on or off, a turns the background sound on or off, [ and\n\
@@ -456,6 +470,15 @@ fn parse_colour(flag: &str, text: &str) -> Result<ColourDepth, String> {
 }
 
 /// Parses a volume flag's value.
+fn parse_ambient_flag(flag: &str, text: &str) -> Result<Option<Ambience>, String> {
+    config::parse_ambient_sound(text).ok_or_else(|| {
+        format!(
+            "{flag} wants auto or one of {}, not \"{text}\"",
+            config::ambient_names()
+        )
+    })
+}
+
 fn parse_volume_flag(flag: &str, text: &str) -> Result<u8, String> {
     sound::parse_volume(text)
         .ok_or_else(|| format!("{flag} wants a whole number from 0 to 100, not \"{text}\""))
@@ -523,6 +546,12 @@ fn parse_watch(args: impl Iterator<Item = String>, follow: bool) -> Result<Comma
             "--ambient-volume" => {
                 flags.ambient_volume =
                     Some(parse_volume_flag(&flag, &value(&flag, inline, &mut args)?)?)
+            }
+            "--ambient-sound" => {
+                flags.ambient_sound = Some(parse_ambient_flag(
+                    &flag,
+                    &value(&flag, inline, &mut args)?,
+                )?)
             }
             "--reduced-motion" => flags.reduced_motion = true,
             "--no-sound" => flags.no_sound = true,
@@ -598,6 +627,15 @@ fn parse_config(args: impl Iterator<Item = String>) -> Result<Command, String> {
 fn parse_sounds(args: impl Iterator<Item = String>) -> Result<Command, String> {
     let args: Vec<String> = args.collect();
     match args.as_slice() {
+        [ambient] if ambient == "ambient" => Ok(Command::SoundsAmbient(None)),
+        [ambient, name] if ambient == "ambient" => Ok(Command::SoundsAmbient(Some(
+            Ambience::parse(name).ok_or_else(|| {
+                format!(
+                    "\"{name}\" is not a background sound. Use one of {}.",
+                    config::ambient_names()
+                )
+            })?,
+        ))),
         [play, set] if play == "play" => Ok(Command::SoundsPlay {
             set: parse_set("sounds play", set)?,
             event: None,
@@ -612,7 +650,9 @@ fn parse_sounds(args: impl Iterator<Item = String>) -> Result<Command, String> {
             })?),
         }),
         _ => Err(
-            "sounds takes play <set> [event], such as sounds play marimba recovered".to_string(),
+            "sounds takes play <set> [event] or ambient [sound], such as sounds play marimba \
+             recovered"
+                .to_string(),
         ),
     }
 }
@@ -828,6 +868,12 @@ pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Command, String>
             "--ambient-volume" => {
                 options.ambient_volume =
                     Some(parse_volume_flag(&flag, &value(&flag, inline, &mut args)?)?)
+            }
+            "--ambient-sound" => {
+                options.ambient_sound = Some(parse_ambient_flag(
+                    &flag,
+                    &value(&flag, inline, &mut args)?,
+                )?)
             }
             "--scene" => {
                 let name = value(&flag, inline, &mut args)?;

@@ -64,10 +64,14 @@ pub enum Tone {
     Warnings,
     /// A command in a followed shell was not found, which is almost always a typo.
     Typo,
+    /// A passing run has no warnings after the last one had some.
+    Clean,
+    /// The watch stopped on its own: bacon quit or the followed command could not start.
+    Stopped,
 }
 
 impl Tone {
-    pub const ALL: [Tone; 7] = [
+    pub const ALL: [Tone; 9] = [
         Tone::Pass,
         Tone::Fail,
         Tone::Tick,
@@ -75,6 +79,8 @@ impl Tone {
         Tone::StillFailing,
         Tone::Warnings,
         Tone::Typo,
+        Tone::Clean,
+        Tone::Stopped,
     ];
 
     /// The name used in the config file and by `sounds play`.
@@ -87,6 +93,8 @@ impl Tone {
             Tone::StillFailing => "still_failing",
             Tone::Warnings => "warnings",
             Tone::Typo => "typo",
+            Tone::Clean => "clean",
+            Tone::Stopped => "stopped",
         }
     }
 
@@ -103,6 +111,9 @@ impl Tone {
             Tone::StillFailing => 0.3,
             // a mistyped command is common and small, so it is a nudge rather than an alarm
             Tone::Typo => 0.6,
+            // good news about something small, so it sits below a pass
+            Tone::Clean => 0.7,
+            Tone::Stopped => 0.8,
             _ => 1.0,
         }
     }
@@ -341,6 +352,13 @@ fn phrase(tone: Tone) -> (Vec<Note>, f32) {
         Tone::Warnings => (vec![note(440.0, 0.0), note(523.25, 0.16)], 0.55),
         // two quick low notes a step apart, a soft shrug that is clearly not the fail phrase
         Tone::Typo => (vec![note(392.0, 0.0), note(349.23, 0.09)], 0.35),
+        // the warnings question answered: a rising fifth from the same A4
+        Tone::Clean => (vec![note(440.0, 0.0), note(659.25, 0.16)], 0.55),
+        // a slow falling major triad from G4, winding down rather than breaking like the fail
+        Tone::Stopped => (
+            vec![note(392.0, 0.0), note(329.63, 0.2), note(261.63, 0.4)],
+            0.8,
+        ),
     }
 }
 
@@ -963,6 +981,22 @@ mod tests {
         assert!(fail.iter().all(|n| n.freq < pass[0].freq));
         let (recovered, _) = phrase(Tone::Recovered);
         assert!(recovered.last().unwrap().freq > pass.last().unwrap().freq);
+    }
+
+    #[test]
+    fn the_clean_phrase_answers_the_warnings_and_the_stopped_phrase_settles() {
+        let (warnings, _) = phrase(Tone::Warnings);
+        let (clean, _) = phrase(Tone::Clean);
+        assert_eq!(clean[0].freq, warnings[0].freq);
+        assert!(clean[1].freq > warnings[1].freq);
+        let (stopped, _) = phrase(Tone::Stopped);
+        assert!(stopped.windows(2).all(|w| w[1].freq < w[0].freq));
+        // it stays above the fail phrase's low note, so it never reads as a failure
+        let (fail, _) = phrase(Tone::Fail);
+        assert!(stopped.iter().all(|n| n.freq > fail[1].freq));
+        assert!(Tone::Clean.on_by_default() && Tone::Stopped.on_by_default());
+        assert_eq!(Tone::parse("clean"), Some(Tone::Clean));
+        assert_eq!(Tone::parse("Stopped"), Some(Tone::Stopped));
     }
 
     #[test]

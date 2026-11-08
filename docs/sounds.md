@@ -3,8 +3,8 @@
 The watch and follow modes play a short tone for each change in a build or a command. Any scene
 can also play a quiet [background sound](#background-sound). Every set plays the same short
 phrase for each event, so the meaning carries over when the set changes: a rising triad for a pass, a falling fourth for a failure, the triad landing an octave up
-for a fix, a rising minor third for new warnings and two soft low notes for a typo. Only the timbre
-differs.
+for a fix, a rising minor third for new warnings, a rising fifth when the last warning clears, two
+soft low notes for a typo and a slow falling triad when the watch stops. Only the timbre differs.
 
 | Set | Sounds like |
 | --- | --- |
@@ -26,11 +26,14 @@ differs.
 | `warnings` | A passing run has more warnings than the last | Yes |
 | `still_failing` | A run fails again. Very quiet | No |
 | `typo` | A followed command was not found. Softer than a failure | Yes |
+| `clean` | A passing run has no warnings after the last one had some | Yes |
+| `stopped` | The watch stopped on its own: bacon quit or the followed command could not start | Yes |
 
 ```sh
 zacess-scenes sounds play marimba            # the pass tone
 zacess-scenes sounds play kalimba recovered  # one event
 zacess-scenes sounds play rain               # droplets over rain
+zacess-scenes sounds play glass stopped      # the watch stopping
 ```
 
 The tones are synthesised by the program, with soft envelopes and short fades so they never click
@@ -63,11 +66,21 @@ always heard clearly. The players are separate programs, so it stops rather than
 
 | Sound | Plays under |
 | --- | --- |
-| Water: slow waves | `sea`, `waves`, `forest-stream`, `lily-pads`, `koi-pond`, `harbour`, `lanterns`, `mountain-lake`, `tide-pools`, `paper-boats`, `rocket-launch`, `flood`, `listing-ship`, `broken-bridge`, `leak`, `erosion` and `launch-scrub` |
-| Rain: a steady hiss with soft drops | `rain`, `storm` and `tea` |
-| Wind: slow gusts | `snow`, `aurora`, `desert-night`, `balloons`, `countryside`, `autumn`, `blossom`, `sunflower-field`, `windmills`, `picnic`, `wilt`, `fog`, `drought`, `rockslide`, `dust-storm`, `thin-ice`, `overgrown`, `drone-landing` and `landing-abort` |
-| Fire: a low rumble and soft crackles | `campfire`, `winter-cabin` and `volcano` |
-| Night: a quiet bed with the odd cricket | Every other scene, your own Lua scenes included |
+| `water`: slow waves | `sea`, `waves`, `lily-pads`, `koi-pond`, `harbour`, `lanterns`, `mountain-lake`, `tide-pools`, `paper-boats`, `rocket-launch`, `flood`, `listing-ship`, `broken-bridge`, `leak`, `erosion` and `launch-scrub` |
+| `rain`: a steady hiss with soft drops | `rain`, `storm` and `tea` |
+| `wind`: slow gusts | `snow`, `desert-night`, `balloons`, `autumn`, `windmills`, `wilt`, `fog`, `drought`, `rockslide`, `dust-storm`, `thin-ice`, `drone-landing` and `landing-abort` |
+| `fire`: a low rumble and soft crackles | `campfire`, `winter-cabin` and `volcano` |
+| `stream`: a babbling stream with rising bubbles | `forest-stream` |
+| `birds`: a soft breeze with phrases of birdsong | `countryside`, `blossom`, `garden`, `sunflower-field`, `picnic` and `overgrown` |
+| `hum`: a quiet machine room, a low hum and a fan | `pcb-bring-up`, `dead-led`, `short-circuit`, `corrosion` and `tangle` |
+| `city`: distant traffic with cars passing far off | `rooftops`, `city-night`, `traffic-jam`, `pit-stop` and `pit-stop-stuck` |
+| `pad`: a slow warm chord that swells and fades | `zacess`, `aurora`, `orbit`, `constellations`, `tiles` and `ribbons` |
+| `night`: a quiet bed with the odd cricket | Every other scene, your own Lua scenes included |
+
+One sound can play under every scene in place of each scene's own: `--ambient-sound pad`,
+`ZACESS_AMBIENT_SOUND=pad` or `sound = "pad"` under `[ambient]`. `auto` goes back to each scene's
+own. `zacess-scenes sounds ambient` plays a few seconds of each and `zacess-scenes sounds ambient
+birds` plays one.
 
 Each sound is a 20 second loop made by the program from seeded noise, so it is always the same and
 cached like the tones. The loop is started again as it ends, which leaves a gap of a few
@@ -79,6 +92,7 @@ Turning sound off with `--no-sound`, `ZACESS_SOUND=0` or the config turns it off
 | On | `--ambient` | `ZACESS_AMBIENT=1` | `enabled = true` under `[ambient]` |
 | Off for one run | `--no-ambient` | `ZACESS_AMBIENT=0` | |
 | Volume from 0 to 100, 20 by default | `--ambient-volume <n>` | | `volume` under `[ambient]` |
+| One sound for every scene, `auto` by default | `--ambient-sound <name>` | `ZACESS_AMBIENT_SOUND=<name>` | `sound` under `[ambient]` |
 
 `a` turns it on or off while a scene runs and `[` and `]` change its volume. A scene run on its own
 has no tones, so `m`, `+` and `-` work the background sound there too.

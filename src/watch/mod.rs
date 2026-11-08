@@ -173,15 +173,38 @@ pub fn bacon_missing() -> String {
     )
 }
 
+/// How the warning count moved between two passing runs.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Warned {
+    Same,
+    More,
+    /// Down to none from some.
+    Cleared,
+}
+
+impl Warned {
+    pub fn between(before: u64, now: u64) -> Warned {
+        if now > before {
+            Warned::More
+        } else if now == 0 && before > 0 {
+            Warned::Cleared
+        } else {
+            Warned::Same
+        }
+    }
+}
+
 /// The tone for a finished run. A fix plays the recovered tone, a change or a run asked for with
-/// a key plays the pass or fail tone, new warnings on a passing build play the warnings tone and
-/// a build that keeps failing plays the quiet still failing tone, which is off unless turned on.
-pub fn tone_for(previous: Phase, now: Phase, asked: bool, new_warnings: bool) -> Option<Tone> {
+/// a key plays the pass or fail tone, new warnings on a passing build play the warnings tone, the
+/// last warning cleared plays the clean tone and a build that keeps failing plays the quiet still
+/// failing tone, which is off unless turned on.
+pub fn tone_for(previous: Phase, now: Phase, asked: bool, warned: Warned) -> Option<Tone> {
     let changed = previous != now;
     match now {
         Phase::Passing if previous == Phase::Failing => Some(Tone::Recovered),
         Phase::Passing if changed || asked => Some(Tone::Pass),
-        Phase::Passing if new_warnings => Some(Tone::Warnings),
+        Phase::Passing if warned == Warned::More => Some(Tone::Warnings),
+        Phase::Passing if warned == Warned::Cleared => Some(Tone::Clean),
         Phase::Failing if changed || asked => Some(Tone::Fail),
         Phase::Failing => Some(Tone::StillFailing),
         _ => None,
@@ -392,7 +415,7 @@ impl Watch {
                     self.passes += 1;
                     Phase::Passing
                 };
-                let new_warnings = report.warnings > warnings_before;
+                let warned = Warned::between(warnings_before, report.warnings);
                 let typo = self.mode == Mode::Follow && follow::is_typo(&report);
                 self.report = Some(report);
                 self.running = false;
@@ -402,7 +425,7 @@ impl Watch {
                 let tone = if typo {
                     Some(Tone::Typo)
                 } else {
-                    tone_for(previous, self.phase, self.asked, new_warnings)
+                    tone_for(previous, self.phase, self.asked, warned)
                 };
                 self.asked = false;
                 if previous != self.phase {
@@ -434,10 +457,14 @@ impl Watch {
                 }
             }
             Event::Exited(line) => {
+                let already = self.phase == Phase::Stopped;
                 self.phase = Phase::Stopped;
                 self.running = false;
                 self.message = Some(line);
-                Outcome::default()
+                Outcome {
+                    tone: (!already).then_some(Tone::Stopped),
+                    ..Outcome::default()
+                }
             }
         }
     }
@@ -962,25 +989,53 @@ mod tests {
     #[test]
     fn tones_follow_changes_fixes_warnings_and_requests() {
         use Phase::*;
-        assert_eq!(tone_for(Waiting, Passing, false, false), Some(Tone::Pass));
-        assert_eq!(tone_for(Passing, Failing, false, false), Some(Tone::Fail));
-        assert_eq!(tone_for(Waiting, Failing, false, false), Some(Tone::Fail));
         assert_eq!(
-            tone_for(Failing, Passing, false, false),
+            tone_for(Waiting, Passing, false, Warned::Same),
+            Some(Tone::Pass)
+        );
+        assert_eq!(
+            tone_for(Passing, Failing, false, Warned::Same),
+            Some(Tone::Fail)
+        );
+        assert_eq!(
+            tone_for(Waiting, Failing, false, Warned::Same),
+            Some(Tone::Fail)
+        );
+        assert_eq!(
+            tone_for(Failing, Passing, false, Warned::Same),
             Some(Tone::Recovered)
         );
         assert_eq!(
-            tone_for(Failing, Failing, false, false),
+            tone_for(Failing, Failing, false, Warned::Same),
             Some(Tone::StillFailing)
         );
-        assert_eq!(tone_for(Failing, Failing, true, false), Some(Tone::Fail));
-        assert_eq!(tone_for(Passing, Passing, false, false), None);
         assert_eq!(
-            tone_for(Passing, Passing, false, true),
+            tone_for(Failing, Failing, true, Warned::Same),
+            Some(Tone::Fail)
+        );
+        assert_eq!(tone_for(Passing, Passing, false, Warned::Same), None);
+        assert_eq!(
+            tone_for(Passing, Passing, false, Warned::More),
             Some(Tone::Warnings)
         );
-        assert_eq!(tone_for(Passing, Passing, true, false), Some(Tone::Pass));
-        assert_eq!(tone_for(Passing, Stopped, true, false), None);
+        assert_eq!(
+            tone_for(Passing, Passing, true, Warned::Same),
+            Some(Tone::Pass)
+        );
+        assert_eq!(tone_for(Passing, Stopped, true, Warned::Same), None);
+        assert_eq!(
+            tone_for(Passing, Passing, false, Warned::Cleared),
+            Some(Tone::Clean)
+        );
+        // a fix or a key press says more than the warnings do
+        assert_eq!(
+            tone_for(Failing, Passing, false, Warned::Cleared),
+            Some(Tone::Recovered)
+        );
+        assert_eq!(Warned::between(3, 0), Warned::Cleared);
+        assert_eq!(Warned::between(0, 0), Warned::Same);
+        assert_eq!(Warned::between(3, 1), Warned::Same);
+        assert_eq!(Warned::between(1, 2), Warned::More);
     }
 
     #[test]
@@ -1169,9 +1224,13 @@ mod tests {
     #[test]
     fn bacon_stopping_is_shown_and_r_starts_again() {
         let mut watch = Watch::new("sample".into(), "check".into());
-        watch.apply(Event::Exited("error: unknown job".into()), Instant::now());
+        let stopped = watch.apply(Event::Exited("error: unknown job".into()), Instant::now());
+        assert_eq!(stopped.tone, Some(Tone::Stopped));
         assert_eq!(watch.phase, Phase::Stopped);
-        assert_eq!(watch.message.as_deref(), Some("error: unknown job"));
+        // a second exit line while already stopped stays quiet
+        let again = watch.apply(Event::Exited("bacon quit".into()), Instant::now());
+        assert_eq!(again.tone, None);
+        assert_eq!(watch.message.as_deref(), Some("bacon quit"));
         watch.restart("check");
         assert_eq!(watch.phase, Phase::Waiting);
         assert!(watch.message.is_none());

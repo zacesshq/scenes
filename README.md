@@ -216,25 +216,25 @@ unpack the archive and put `zacess-scenes` (or `zacess-scenes.exe`) somewhere on
 On macOS:
 
 ```sh
-shasum -a 256 -c zacess-scenes-v1.0.0-aarch64-apple-darwin.tar.gz.sha256
-tar -xzf zacess-scenes-v1.0.0-aarch64-apple-darwin.tar.gz
-install -m 755 zacess-scenes-v1.0.0-aarch64-apple-darwin/zacess-scenes ~/.local/bin/
+shasum -a 256 -c zacess-scenes-v1.1.0-aarch64-apple-darwin.tar.gz.sha256
+tar -xzf zacess-scenes-v1.1.0-aarch64-apple-darwin.tar.gz
+install -m 755 zacess-scenes-v1.1.0-aarch64-apple-darwin/zacess-scenes ~/.local/bin/
 ```
 
 On Linux:
 
 ```sh
-sha256sum -c zacess-scenes-v1.0.0-x86_64-unknown-linux-musl.tar.gz.sha256
-tar -xzf zacess-scenes-v1.0.0-x86_64-unknown-linux-musl.tar.gz
-install -m 755 zacess-scenes-v1.0.0-x86_64-unknown-linux-musl/zacess-scenes ~/.local/bin/
+sha256sum -c zacess-scenes-v1.1.0-x86_64-unknown-linux-musl.tar.gz.sha256
+tar -xzf zacess-scenes-v1.1.0-x86_64-unknown-linux-musl.tar.gz
+install -m 755 zacess-scenes-v1.1.0-x86_64-unknown-linux-musl/zacess-scenes ~/.local/bin/
 ```
 
 On Windows, in PowerShell, the two hashes printed must match:
 
 ```powershell
-(Get-FileHash .\zacess-scenes-v1.0.0-x86_64-pc-windows-msvc.zip).Hash
-Get-Content .\zacess-scenes-v1.0.0-x86_64-pc-windows-msvc.zip.sha256
-Expand-Archive .\zacess-scenes-v1.0.0-x86_64-pc-windows-msvc.zip -DestinationPath .
+(Get-FileHash .\zacess-scenes-v1.1.0-x86_64-pc-windows-msvc.zip).Hash
+Get-Content .\zacess-scenes-v1.1.0-x86_64-pc-windows-msvc.zip.sha256
+Expand-Archive .\zacess-scenes-v1.1.0-x86_64-pc-windows-msvc.zip -DestinationPath .
 ```
 
 ### From a script

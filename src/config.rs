@@ -10,6 +10,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+use crate::ambient::Ambience;
 use crate::scene::Level;
 use crate::sound::{self, QuietHours, SoundSet, Tone};
 
@@ -25,6 +26,8 @@ pub const MOTION_ENV: &str = "ZACESS_MOTION";
 pub const NOTIFY_ENV: &str = "ZACESS_NOTIFY";
 /// Turns the ambient sound on or off, overriding the config file.
 pub const AMBIENT_ENV: &str = "ZACESS_AMBIENT";
+/// Names one background sound for every scene. `auto` keeps each scene's own.
+pub const AMBIENT_SOUND_ENV: &str = "ZACESS_AMBIENT_SOUND";
 /// The ambient sound's volume when nothing sets it: well under the tones, so a pass or a fail is
 /// always heard over it.
 pub const AMBIENT_DEFAULT_VOLUME: u8 = 20;
@@ -350,12 +353,14 @@ pub struct Config {
     pub notify: Option<bool>,
     pub ambient: Option<bool>,
     pub ambient_volume: Option<u8>,
+    /// One background sound for every scene; `None` inside means each scene's own.
+    pub ambient_sound: Option<Option<Ambience>>,
     /// Seconds a followed command has to run for before its result counts.
     pub follow_min_seconds: Option<f64>,
 }
 
 /// Every key the file may hold.
-pub const KEYS: [&str; 24] = [
+pub const KEYS: [&str; 27] = [
     "scenes.theme",
     "scenes.pass",
     "scenes.fail",
@@ -376,9 +381,12 @@ pub const KEYS: [&str; 24] = [
     "sound.events.still_failing",
     "sound.events.warnings",
     "sound.events.typo",
+    "sound.events.clean",
+    "sound.events.stopped",
     "notifications.enabled",
     "ambient.enabled",
     "ambient.volume",
+    "ambient.sound",
     "follow.min_seconds",
 ];
 
@@ -520,6 +528,15 @@ impl Config {
                         ));
                     }
                 },
+                "ambient.sound" => {
+                    let text = want_string(key, value, line)?;
+                    config.ambient_sound = Some(parse_ambient_sound(&text).ok_or_else(|| {
+                        format!(
+                            "line {line}: ambient sound should be auto or one of {}",
+                            ambient_names()
+                        )
+                    })?);
+                }
                 "follow.min_seconds" => {
                     let seconds = match value {
                         Value::Integer(n) => *n as f64,
@@ -623,6 +640,8 @@ pub struct Flags {
     pub volume: Option<u8>,
     pub ambient: Option<bool>,
     pub ambient_volume: Option<u8>,
+    /// One background sound for every scene; `None` inside means each scene's own.
+    pub ambient_sound: Option<Option<Ambience>>,
 }
 
 /// Every setting after the flags, the variables, the file and the defaults are combined.
@@ -648,7 +667,25 @@ pub struct Resolved {
     pub notify: bool,
     pub ambient: bool,
     pub ambient_volume: u8,
+    /// One background sound for every scene. `None` keeps each scene's own.
+    pub ambient_sound: Option<Ambience>,
     pub follow_min_seconds: f64,
+}
+
+/// `auto` (each scene's own sound) or the name of one background sound for every scene.
+pub fn parse_ambient_sound(text: &str) -> Option<Option<Ambience>> {
+    let key = text.trim().to_ascii_lowercase();
+    if key == "auto" {
+        Some(None)
+    } else {
+        Ambience::parse(&key).map(Some)
+    }
+}
+
+/// The background sound names, for messages.
+pub fn ambient_names() -> String {
+    let names: Vec<&str> = Ambience::ALL.iter().map(|a| a.name()).collect();
+    names.join(", ")
 }
 
 fn env_bool(value: Option<&str>) -> Option<bool> {
@@ -747,6 +784,17 @@ pub fn resolve(
         (None, None) => config.ambient.unwrap_or(false),
     };
 
+    let ambient_sound = match (flags.ambient_sound, var(AMBIENT_SOUND_ENV)) {
+        (Some(choice), _) => choice,
+        (None, Some(text)) => parse_ambient_sound(&text).ok_or_else(|| {
+            format!(
+                "{AMBIENT_SOUND_ENV} is \"{text}\"; use auto or one of {}.",
+                ambient_names()
+            )
+        })?,
+        (None, None) => config.ambient_sound.flatten(),
+    };
+
     let events = Tone::ALL
         .iter()
         .zip(&config.events)
@@ -777,6 +825,7 @@ pub fn resolve(
             .ambient_volume
             .or(config.ambient_volume)
             .unwrap_or(AMBIENT_DEFAULT_VOLUME),
+        ambient_sound,
         follow_min_seconds: config.follow_min_seconds.unwrap_or(0.0),
     })
 }
@@ -847,6 +896,8 @@ pub fn starter() -> String {
 # still_failing = false
 # warnings = true
 # typo = true
+# clean = true
+# stopped = true
 
 [notifications]
 # A desktop notification when the build changes between passing and failing, which a screen
@@ -854,11 +905,15 @@ pub fn starter() -> String {
 # enabled = false
 
 [ambient]
-# A quiet background sound that suits the scene: water, rain, wind, fire or a night meadow. It
+# A quiet background sound that suits the scene, such as water, rain, birdsong or a slow pad. It
 # plays under the tones and stops for a moment while one plays. a turns it on or off and [ and ]
 # change its volume while a scene runs. Sound off and quiet hours silence it too.
 # enabled = false
 # volume = {ambient_volume}
+
+# One background sound for every scene instead of each scene's own: auto or one of
+# {ambiences}.
+# sound = "auto"
 
 [follow]
 # zacess-scenes follow shows how each command in a shell ended. A command that finishes faster
@@ -868,6 +923,7 @@ pub fn starter() -> String {
         sets = sets.join(", "),
         volume = sound::DEFAULT_VOLUME,
         ambient_volume = AMBIENT_DEFAULT_VOLUME,
+        ambiences = ambient_names(),
     )
 }
 
@@ -1111,6 +1167,32 @@ mod tests {
         assert_eq!(from_flags.sound_set, SoundSet::Glass);
         assert_eq!(from_flags.volume, 5);
         assert!(from_flags.notify && !from_flags.sound);
+    }
+
+    #[test]
+    fn one_background_sound_comes_from_a_flag_a_variable_or_the_file() {
+        let file = Config::parse("[ambient]\nsound = \"birds\"\n").unwrap();
+        assert_eq!(file.ambient_sound, Some(Some(Ambience::Birds)));
+        let defaults = resolve(&Flags::default(), none, &Config::default()).unwrap();
+        assert_eq!(defaults.ambient_sound, None);
+        let from_file = resolve(&Flags::default(), none, &file).unwrap();
+        assert_eq!(from_file.ambient_sound, Some(Ambience::Birds));
+        let env = |name: &str| (name == AMBIENT_SOUND_ENV).then(|| "Pad".to_string());
+        assert_eq!(
+            resolve(&Flags::default(), env, &file)
+                .unwrap()
+                .ambient_sound,
+            Some(Ambience::Pad)
+        );
+        // auto on the command line goes back to each scene's own sound
+        let flags = Flags {
+            ambient_sound: Some(None),
+            ..Flags::default()
+        };
+        assert_eq!(resolve(&flags, env, &file).unwrap().ambient_sound, None);
+        assert!(Config::parse("[ambient]\nsound = \"thunder\"\n").is_err());
+        let bad = |name: &str| (name == AMBIENT_SOUND_ENV).then(|| "thunder".to_string());
+        assert!(resolve(&Flags::default(), bad, &Config::default()).is_err());
     }
 
     #[test]

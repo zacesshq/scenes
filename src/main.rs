@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 use std::time::Duration;
 
-use zacess_scenes::ambient::Ambient;
+use zacess_scenes::ambient::{Ambience, Ambient};
 use zacess_scenes::catalogue::Catalogue;
 use zacess_scenes::cli::{self, Command};
 use zacess_scenes::colour::ColourDepth;
@@ -117,6 +117,14 @@ fn list(catalogue: &Catalogue) -> String {
         "\nEvents: {}.\n",
         Tone::ALL.map(|t| t.name()).join(", ")
     ));
+    text.push_str("\nBackground sounds (preview with zacess-scenes sounds ambient [sound]):\n");
+    for ambience in Ambience::ALL {
+        text.push_str(&format!(
+            "  {:<8} {}\n",
+            ambience.name(),
+            ambience.summary()
+        ));
+    }
     text
 }
 
@@ -178,6 +186,7 @@ fn run() -> Result<(), String> {
         }
         Command::SceneNew { name, force } => return scene_new(&name, force),
         Command::SoundsPlay { set, event } => return sounds_play(set, event),
+        Command::SoundsAmbient(ambience) => return sounds_ambient(ambience),
         Command::WatchHelp => return emit(&cli::watch_usage()),
         Command::SnapshotHelp => return emit(&cli::snapshot_usage()),
         Command::Snapshot(options) => return run_snapshot(options),
@@ -197,6 +206,7 @@ fn run() -> Result<(), String> {
         reduced_motion: options.reduced_motion,
         ambient: options.ambient,
         ambient_volume: options.ambient_volume,
+        ambient_sound: options.ambient_sound,
         ..Flags::default()
     };
     let resolved = config::resolve(&flags, env, &config)?;
@@ -307,6 +317,7 @@ fn run() -> Result<(), String> {
         None
     };
     let ambient = Ambient::new(resolved.ambient, resolved.ambient_volume)
+        .with_fixed(resolved.ambient_sound)
         .with_quiet_hours(resolved.quiet_hours);
     let mut playlist = app::Playlist {
         catalogue: &mut catalogue,
@@ -358,6 +369,24 @@ fn sounds_play(set: SoundSet, event: Option<Tone>) -> Result<(), String> {
     ))?;
     if let Some(mut child) = sound.play_now(set, tone) {
         let _ = child.wait();
+    }
+    Ok(())
+}
+
+/// Plays a few seconds of one background sound or of each in turn at the configured volume.
+fn sounds_ambient(only: Option<Ambience>) -> Result<(), String> {
+    let config = load_config()?;
+    let resolved = config::resolve(&Flags::default(), env, &config)?;
+    let volume = resolved.ambient_volume.max(1);
+    let wanted: Vec<Ambience> = only.map_or(Ambience::ALL.to_vec(), |a| vec![a]);
+    let seconds = if only.is_some() { 12 } else { 6 };
+    for ambience in wanted {
+        emit(&format!(
+            "{:<8} {} (volume {volume})\n",
+            ambience.name(),
+            ambience.summary()
+        ))?;
+        zacess_scenes::ambient::preview(ambience, volume, std::time::Duration::from_secs(seconds))?;
     }
     Ok(())
 }
@@ -563,6 +592,7 @@ fn run_watch(options: cli::WatchOptions, following: bool) -> Result<(), String> 
         .with_events(resolved.events.clone())
         .with_quiet_hours(resolved.quiet_hours);
     let ambient = Ambient::new(resolved.ambient, resolved.ambient_volume)
+        .with_fixed(resolved.ambient_sound)
         .with_quiet_hours(resolved.quiet_hours);
     let mut context = watch::Context {
         theme,

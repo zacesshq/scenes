@@ -252,7 +252,7 @@ seconds.
 ## Sound
 
 A scene on its own is silent unless the background sound is turned on. The watch and follow modes
-can play seven short events in one of eight sound sets: `bells`, `marimba`, `kalimba`, `pad`,
+can play nine short events in one of eight sound sets: `bells`, `marimba`, `kalimba`, `pad`,
 `chip`, `glass`, `piano` and `rain`.
 
 | Event | When | On by default |
@@ -264,14 +264,18 @@ can play seven short events in one of eight sound sets: `bells`, `marimba`, `kal
 | warnings | A passing run has more warnings than the last | Yes |
 | still_failing | A run fails again, at 30 percent of the level | No |
 | typo | A followed command was not found, at 60 percent of the level | Yes |
+| clean | A passing run has no warnings after the last one had some, at 70 percent of the level | Yes |
+| stopped | The watch stopped on its own, at 80 percent of the level | Yes |
 
 - Sound is never the only signal. Every event has the same state on screen at the same moment: the
   banner, the scene and the status bar show passing, failing or recovered. The status bar shows
   `running` while a rebuild runs and the warning count.
 - Every set plays the same phrase for each event, a rising triad for a pass, a falling fourth for a
-  failure, the triad landing an octave up for a fix, a rising minor third for warnings and two soft
-  low notes a step apart for a typo, so the meaning does not change with the timbre. A typo shows
-  TYPO on screen as well as its tone.
+  failure, the triad landing an octave up for a fix, a rising minor third for warnings, a rising
+  fifth when they clear, two soft low notes a step apart for a typo and a slow falling triad when
+  the watch stops, so the meaning does not change with the timbre. A typo shows TYPO on screen as
+  well as its tone, the warning count shows 0 when they clear and a stopped watch says why on
+  screen.
 - Every tone is levelled to the same loudness, measured as the root mean square of its loudest 50
   milliseconds. It is kept under a peak of 70 percent of full scale. `every_set_and_event_is_levelled_to_the_same_loudness`
   holds each tone within a decibel of its level and every set's pass tone within 1.5 decibels of
@@ -292,8 +296,10 @@ can play seven short events in one of eight sound sets: `bells`, `marimba`, `kal
 
 - Off unless turned on with `--ambient`, `ZACESS_AMBIENT=1` or `enabled = true` under `[ambient]`.
   `--no-ambient` or `a` turns it off again.
-- A quiet loop that suits the scene: water, rain, wind, fire or a night meadow. It carries no
-  meaning and nothing depends on hearing it.
+- A quiet loop that suits the scene: water, rain, wind, fire, a night meadow, a stream, birdsong,
+  a machine hum, a distant city or a slow pad. One of them can play under every scene with
+  `--ambient-sound`, `ZACESS_AMBIENT_SOUND` or `sound` under `[ambient]`. It carries no meaning and
+  nothing depends on hearing it.
 - It plays at 20 out of 100 by default, under the tones' 50. It is also levelled to about a third
   of the tones' loudness at the same volume. `no_sample_reaches_full_scale_and_it_stays_under_the_tones`
   checks every loop. `[` and `]` change it in steps of 10 and 0 is silent.

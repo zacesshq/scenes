@@ -1,4 +1,5 @@
-//! Ambient sound: a quiet bed of water, rain, wind, fire or night sounds that plays the whole
+//! Ambient sound: a quiet bed of water, rain, wind, fire, night, a stream, birdsong, a machine hum,
+//! a distant city or a slow pad that plays the whole
 //! time a scene runs, under the short event tones. Like the tones it is synthesised at run time
 //! into a WAV file in the cache folder and played by the system's own player, so nothing is
 //! bundled and no audio library is linked.
@@ -51,6 +52,16 @@ pub enum Ambience {
     Fire,
     /// A very quiet bed with the occasional cricket.
     Night,
+    /// A small stream: a babbling hiss with bubbles that rise in pitch.
+    Stream,
+    /// A soft breeze with little phrases of birdsong.
+    Birds,
+    /// A quiet machine room: a low hum with a fan's soft air.
+    Hum,
+    /// Distant traffic: a low rumble with cars passing far off.
+    City,
+    /// A slow warm chord that swells and fades, for focus.
+    Pad,
 }
 
 /// Which ambience each built-in scene plays. A scene not in the table, such as a user's Lua
@@ -62,78 +73,83 @@ const SCENE_AMBIENCE: [(&str, Ambience); 65] = [
     ("starfield", Ambience::Night),
     ("code-rain", Ambience::Night),
     ("fireflies", Ambience::Night),
-    ("aurora", Ambience::Wind),
+    ("aurora", Ambience::Pad),
     ("campfire", Ambience::Fire),
     ("waves", Ambience::Water),
-    ("zacess", Ambience::Night),
-    ("forest-stream", Ambience::Water),
+    ("zacess", Ambience::Pad),
+    ("forest-stream", Ambience::Stream),
     ("desert-night", Ambience::Wind),
-    ("rooftops", Ambience::Night),
+    ("rooftops", Ambience::City),
     ("lily-pads", Ambience::Water),
     ("koi-pond", Ambience::Water),
     ("harbour", Ambience::Water),
     ("lanterns", Ambience::Water),
     ("balloons", Ambience::Wind),
-    ("countryside", Ambience::Wind),
+    ("countryside", Ambience::Birds),
     // the lit window and chimney smoke make the stove the sound of the cabin, not the snow
     ("winter-cabin", Ambience::Fire),
     ("autumn", Ambience::Wind),
-    ("blossom", Ambience::Wind),
-    ("city-night", Ambience::Night),
-    ("orbit", Ambience::Night),
-    ("constellations", Ambience::Night),
+    ("blossom", Ambience::Birds),
+    ("city-night", Ambience::City),
+    ("orbit", Ambience::Pad),
+    ("constellations", Ambience::Pad),
     // the weather at the window is the loudest thing in a quiet room
     ("tea", Ambience::Rain),
     ("cat-nap", Ambience::Night),
-    ("garden", Ambience::Night),
-    ("tiles", Ambience::Night),
-    ("ribbons", Ambience::Night),
-    ("sunflower-field", Ambience::Wind),
+    ("garden", Ambience::Birds),
+    ("tiles", Ambience::Pad),
+    ("ribbons", Ambience::Pad),
+    ("sunflower-field", Ambience::Birds),
     ("mountain-lake", Ambience::Water),
     ("tide-pools", Ambience::Water),
     ("paper-boats", Ambience::Water),
     ("windmills", Ambience::Wind),
-    ("picnic", Ambience::Wind),
+    ("picnic", Ambience::Birds),
     ("drone-landing", Ambience::Wind),
     // a kitchen counter is indoors and quiet, so the quietest bed suits it best
     ("kettle-boil", Ambience::Night),
     // the pad stands on the shore, so the surf is the sound under the count
     ("rocket-launch", Ambience::Water),
-    ("pit-stop", Ambience::Night),
-    ("pcb-bring-up", Ambience::Night),
+    ("pit-stop", Ambience::City),
+    ("pcb-bring-up", Ambience::Hum),
     ("storm", Ambience::Rain),
     ("flood", Ambience::Water),
     ("listing-ship", Ambience::Water),
-    ("corrosion", Ambience::Night),
-    ("tangle", Ambience::Night),
+    ("corrosion", Ambience::Hum),
+    ("tangle", Ambience::Hum),
     ("wilt", Ambience::Wind),
     ("fog", Ambience::Wind),
     ("broken-bridge", Ambience::Water),
     ("leak", Ambience::Water),
     ("blackout", Ambience::Night),
-    ("traffic-jam", Ambience::Night),
+    ("traffic-jam", Ambience::City),
     ("erosion", Ambience::Water),
     ("drought", Ambience::Wind),
     ("volcano", Ambience::Fire),
     ("rockslide", Ambience::Wind),
     ("dust-storm", Ambience::Wind),
     ("thin-ice", Ambience::Wind),
-    ("short-circuit", Ambience::Night),
-    ("overgrown", Ambience::Wind),
+    ("short-circuit", Ambience::Hum),
+    ("overgrown", Ambience::Birds),
     ("landing-abort", Ambience::Wind),
     ("kettle-cold", Ambience::Night),
     ("launch-scrub", Ambience::Water),
-    ("pit-stop-stuck", Ambience::Night),
-    ("dead-led", Ambience::Night),
+    ("pit-stop-stuck", Ambience::City),
+    ("dead-led", Ambience::Hum),
 ];
 
 impl Ambience {
-    pub const ALL: [Ambience; 5] = [
+    pub const ALL: [Ambience; 10] = [
         Ambience::Water,
         Ambience::Rain,
         Ambience::Wind,
         Ambience::Fire,
         Ambience::Night,
+        Ambience::Stream,
+        Ambience::Birds,
+        Ambience::Hum,
+        Ambience::City,
+        Ambience::Pad,
     ];
 
     /// The name used in file names and settings.
@@ -144,6 +160,27 @@ impl Ambience {
             Ambience::Wind => "wind",
             Ambience::Fire => "fire",
             Ambience::Night => "night",
+            Ambience::Stream => "stream",
+            Ambience::Birds => "birds",
+            Ambience::Hum => "hum",
+            Ambience::City => "city",
+            Ambience::Pad => "pad",
+        }
+    }
+
+    /// What the ambience sounds like, for the lists.
+    pub fn summary(self) -> &'static str {
+        match self {
+            Ambience::Water => "Slow waves of low surf",
+            Ambience::Rain => "A steady soft hiss with the odd drop",
+            Ambience::Wind => "Low gusts rising and falling",
+            Ambience::Fire => "A low rumble with soft crackles",
+            Ambience::Night => "A very quiet bed with the odd cricket",
+            Ambience::Stream => "A babbling stream with rising bubbles",
+            Ambience::Birds => "A soft breeze with phrases of birdsong",
+            Ambience::Hum => "A quiet machine room: a low hum and a fan",
+            Ambience::City => "Distant traffic, cars passing far off",
+            Ambience::Pad => "A slow warm chord that swells and fades",
         }
     }
 
@@ -237,6 +274,24 @@ fn add_chimes(mix: &mut [f32], times: &[(f32, f32, f32)], attack: f32, decay: f3
             let age = i as f32 / SAMPLE_RATE as f32;
             *slot += level * burst(age, attack, decay) * (TAU * freq * age).sin();
         }
+    }
+}
+
+/// Adds one sine note that glides from one pitch to another, with a soft rise and fall so it
+/// never clicks.
+fn add_glide(mix: &mut [f32], start: f32, from: f32, to: f32, length: f32, level: f32) {
+    let first = samples(start);
+    let count = samples(length).max(1);
+    let mut phase = 0.0_f32;
+    for i in 0..count {
+        let Some(slot) = mix.get_mut(first + i) else {
+            break;
+        };
+        let share = i as f32 / count as f32;
+        let freq = (from + (to - from) * share).min(HIGHEST_PITCH);
+        phase += TAU * freq / SAMPLE_RATE as f32;
+        let edge = (std::f32::consts::PI * share).sin();
+        *slot += level * edge * edge * phase.sin();
     }
 }
 
@@ -334,6 +389,115 @@ fn raw(ambience: Ambience, count: usize) -> Vec<f32> {
             }
             add_chimes(&mut mix, &times, 0.005, 0.006);
         }
+        Ambience::Stream => {
+            let (mut high, mut low, mut gurgle) =
+                (LowPass::new(2400.0), LowPass::new(500.0), LowPass::new(7.0));
+            for slot in mix.iter_mut() {
+                let white = noise();
+                let bright = high.step(white);
+                let band = bright - low.step(bright);
+                // a slow random wobble in the level is what makes running water babble
+                let wobble = (gurgle.step(noise()) * 9.0).abs().min(1.0);
+                *slot = band * (0.45 + 0.55 * wobble) * 1.6;
+            }
+            // bubbles: short sine notes that glide up as they pop
+            let mut bubbles = Rng::new(ambience.seed() ^ 0xb0bb);
+            for start in event_times(&mut bubbles, count, 3.0) {
+                let from = bubbles.range(500.0, 900.0);
+                let rise = bubbles.range(1.6, 2.4);
+                let length = bubbles.range(0.03, 0.07);
+                let level = bubbles.range(0.06, 0.14);
+                add_glide(&mut mix, start, from, from * rise, length, level);
+            }
+        }
+        Ambience::Birds => {
+            let (mut low, mut lower) = (LowPass::new(300.0), LowPass::new(300.0));
+            for (i, slot) in mix.iter_mut().enumerate() {
+                let breeze = 0.5 + 0.5 * swell(time(i), 2.0);
+                *slot = breeze * lower.step(low.step(noise())) * 2.0;
+            }
+            // a phrase of two to five chirps, each a quick glide up or down, every few seconds
+            let mut song = Rng::new(ambience.seed() ^ 0xb12d);
+            for start in event_times(&mut song, count, 0.35) {
+                let base = song.range(2200.0, 3600.0);
+                let up = song.unit() < 0.6;
+                let level = song.range(0.05, 0.1);
+                let mut at = start;
+                for _ in 0..2 + song.below(4) {
+                    let length = song.range(0.05, 0.11);
+                    let (from, to) = if up {
+                        (base, base * 1.3)
+                    } else {
+                        (base * 1.3, base)
+                    };
+                    add_glide(&mut mix, at, from, to, length, level);
+                    at += length + song.range(0.03, 0.08);
+                }
+            }
+        }
+        Ambience::Hum => {
+            let (mut air, mut softer) = (LowPass::new(700.0), LowPass::new(700.0));
+            for (i, slot) in mix.iter_mut().enumerate() {
+                let t = time(i);
+                // a 100 Hz hum with soft partials, each a whole number of cycles a loop
+                let hum = (TAU * 100.0 * t).sin()
+                    + 0.5 * (TAU * 200.0 * t).sin()
+                    + 0.2 * (TAU * 300.0 * t).sin();
+                let fan = 0.85 + 0.15 * swell(t, 4.0);
+                *slot = 0.05 * hum + fan * softer.step(air.step(noise())) * 2.2;
+            }
+        }
+        Ambience::City => {
+            let (mut low, mut lower, mut hiss) = (
+                LowPass::new(200.0),
+                LowPass::new(200.0),
+                LowPass::new(1200.0),
+            );
+            // each car far off is a slow rise and fall in the rumble a few seconds long
+            let mut cars = Rng::new(ambience.seed() ^ 0xca25);
+            let passes: Vec<(f32, f32, f32)> = event_times(&mut cars, count, 0.3)
+                .into_iter()
+                .map(|t| (t, cars.range(3.0, 6.0), cars.range(0.5, 1.0)))
+                .collect();
+            for (i, slot) in mix.iter_mut().enumerate() {
+                let t = time(i);
+                let white = noise();
+                let body = lower.step(low.step(white));
+                let mut level = 0.35;
+                for &(start, length, height) in &passes {
+                    let age = t - start;
+                    if (0.0..length).contains(&age) {
+                        level += height * (std::f32::consts::PI * age / length).sin().powi(2);
+                    }
+                }
+                let tyres = hiss.step(white) - body;
+                *slot = level * body * 4.0 + 0.08 * (level - 0.35) * tyres;
+            }
+        }
+        Ambience::Pad => {
+            // D major spread over two octaves; each pitch is a multiple of 0.05 Hz, so it makes a
+            // whole number of cycles in the 20 second loop and the join stays in phase
+            let chord = [146.85_f32, 220.0, 293.65, 370.0, 440.0];
+            for (i, slot) in mix.iter_mut().enumerate() {
+                let t = time(i);
+                let mut sum = 0.0;
+                for (n, &freq) in chord.iter().enumerate() {
+                    // each voice swells at its own pace, so the chord slowly changes colour
+                    let swells = [1.0, 2.0, 3.0, 2.0, 1.0][n];
+                    let level = 0.35 + 0.65 * swell(t + n as f32 * 1.7, swells);
+                    // a second voice 0.4 Hz sharp gives a slow, gentle beat; the phases are kept
+                    // in f64 and wrapped, since f32 loses the cycle by the end of the loop
+                    let cycle = |f: f32| {
+                        let turns = f64::from(f) * i as f64 / f64::from(SAMPLE_RATE);
+                        (std::f64::consts::TAU * turns.fract()) as f32
+                    };
+                    let w = cycle(freq);
+                    sum += level * (w.sin() + 0.25 * cycle(2.0 * freq).sin())
+                        + 0.6 * level * cycle(freq + 0.4).sin();
+                }
+                *slot = sum;
+            }
+        }
     }
     mix
 }
@@ -426,12 +590,38 @@ fn play_command(player: &Player, file: &Path) -> Command {
     }
 }
 
+/// Plays the start of one ambience's loop for `length`, for `sounds ambient`, then stops it.
+pub fn preview(ambience: Ambience, volume: u8, length: Duration) -> Result<(), String> {
+    let player = sound::find_player().ok_or_else(|| {
+        "no sound player was found (afplay, pw-play, paplay, aplay or PowerShell)".to_string()
+    })?;
+    let file = ensure_wav(&sound::cache_dir(), ambience, volume).map_err(|e| e.to_string())?;
+    let mut child = play_command(&player, &file)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let until = Instant::now() + length;
+    while Instant::now() < until {
+        if child.try_wait().ok().flatten().is_some() {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+    Ok(())
+}
+
 /// The ambient sound of a running scene: whether it is on, its volume, quiet hours, the scene's
 /// ambience and the player playing the loop.
 pub struct Ambient {
     enabled: bool,
     volume: u8,
     ambience: Ambience,
+    /// One ambience for every scene, chosen in the settings, in place of each scene's own.
+    fixed: Option<Ambience>,
     quiet: Option<(QuietHours, Clock)>,
     player: Option<Player>,
     dir: PathBuf,
@@ -460,6 +650,7 @@ impl Ambient {
             enabled,
             volume: volume.min(100),
             ambience: Ambience::Night,
+            fixed: None,
             quiet: None,
             player: sound::find_player(),
             dir: sound::cache_dir(),
@@ -514,9 +705,37 @@ impl Ambient {
         self.volume
     }
 
-    /// Follows the scene on screen, switching the loop only when its ambience differs.
+    /// Plays one ambience under every scene instead of each scene's own. `None` goes back to
+    /// following the scene.
+    pub fn with_fixed(mut self, fixed: Option<Ambience>) -> Self {
+        self.fixed = fixed;
+        if let Some(ambience) = fixed {
+            self.ambience = ambience;
+        }
+        self
+    }
+
+    /// Follows the scene on screen, switching the loop only when its ambience differs. A fixed
+    /// ambience from the settings wins over the scene's own.
     pub fn set_scene(&mut self, name: &str) {
-        let ambience = Ambience::for_scene(name);
+        let ambience = self.fixed.unwrap_or_else(|| Ambience::for_scene(name));
+        self.set_ambience(ambience);
+    }
+
+    /// Sets the volume from 0 to 100, starting the loop again at the new level only when it
+    /// changes. Games use this to follow their own volume setting.
+    pub fn set_volume(&mut self, volume: u8) {
+        let volume = volume.min(100);
+        if volume != self.volume {
+            self.volume = volume;
+            self.retry_at = None;
+            self.kill();
+        }
+    }
+
+    /// Plays this ambience from the next tick, switching the loop only when it differs. Games
+    /// use this to pick the sound under each game.
+    pub fn set_ambience(&mut self, ambience: Ambience) {
         if ambience != self.ambience {
             self.ambience = ambience;
             self.kill();
@@ -736,6 +955,36 @@ mod tests {
         }
         assert_eq!(Ambience::for_scene("campfire"), Ambience::Fire);
         assert_eq!(Ambience::for_scene("my-own-scene"), Ambience::Night);
+    }
+
+    #[test]
+    fn every_ambience_plays_under_some_scene() {
+        for ambience in Ambience::ALL {
+            assert!(
+                SCENE_AMBIENCE.iter().any(|&(_, a)| a == ambience),
+                "no scene plays {}",
+                ambience.name()
+            );
+        }
+    }
+
+    #[test]
+    fn a_fixed_ambience_plays_under_every_scene() {
+        let mut ambient = silent(true, 20).with_fixed(Some(Ambience::Pad));
+        assert_eq!(ambient.ambience(), Ambience::Pad);
+        for scene in ["sea", "campfire", "storm", "my-own-scene"] {
+            ambient.set_scene(scene);
+            assert_eq!(ambient.ambience(), Ambience::Pad, "{scene}");
+        }
+        let mut following = silent(true, 20).with_fixed(None);
+        following.set_scene("forest-stream");
+        assert_eq!(following.ambience(), Ambience::Stream);
+        following.set_ambience(Ambience::Hum);
+        assert_eq!(following.ambience(), Ambience::Hum);
+        following.set_volume(140);
+        assert_eq!(following.volume(), 100);
+        following.set_volume(30);
+        assert_eq!(following.volume(), 30);
     }
 
     #[test]

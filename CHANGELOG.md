@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-11-08
+
+### Added
+
+- Five new background sounds, ten in all, each a seamless 20 second loop made by the program. `stream` is a babbling stream with rising bubbles. `birds` is a soft breeze with phrases of birdsong. `hum` is a quiet machine room with a low hum and a fan. `city` is distant traffic with cars passing far off. `pad` is a slow warm chord that swells and fades. Scenes that suit them now play them: `forest-stream` the stream, the meadows and gardens the birds, the circuit boards the hum, the streets and pit stops the city and the calm sky and pattern scenes the pad.
+- `--ambient-sound <name>`, `ZACESS_AMBIENT_SOUND` and `sound` under `[ambient]` play one background sound under every scene. `auto`, the default, keeps each scene's own.
+- `zacess-scenes sounds ambient` plays a few seconds of each background sound and `sounds ambient <name>` plays one. `zacess-scenes list` names them.
+- Two new events in every sound set. `clean` plays a rising fifth when a passing run has no warnings after the last one had some, answering the warnings tone. `stopped` plays a slow falling triad when the watch stops on its own because bacon quit or the followed command could not start. Both are on by default and can be turned off under `[sound.events]`.
+- `Ambient::set_ambience`, `Ambient::set_volume` and `Ambient::with_fixed`, so a program built on the crate can choose the background sound and its level itself. Zacess Games uses them for the sound under each game.
+
 ## [1.0.0] - 2026-11-08
 
 ### Added
@@ -176,7 +186,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 - The README, this changelog, the accessibility statement, the contributing guide, the security policy, the support guide, the code of conduct, a licensing notice for the Zacess mark and the palette, issue forms for a bug, a scene idea and an accessibility problem, a pull request template, CODEOWNERS and Dependabot for the actions and the Cargo dependencies.
 - `docs/scenes.md`, which describes every scene and its reduced motion behaviour.
 
-[Unreleased]: https://github.com/zacesshq/scenes/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/zacesshq/scenes/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/zacesshq/scenes/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/zacesshq/scenes/compare/v0.6.0...v1.0.0
 [0.6.0]: https://github.com/zacesshq/scenes/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/zacesshq/scenes/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/zacesshq/scenes/compare/v0.4.0...v0.5.0

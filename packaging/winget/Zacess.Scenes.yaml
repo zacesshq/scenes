@@ -1,6 +1,6 @@
-# winget version manifest for Zacess Scenes 1.0.0.
+# winget version manifest for Zacess Scenes 1.1.0.
 PackageIdentifier: Zacess.Scenes
-PackageVersion: 1.0.0
+PackageVersion: 1.1.0
 DefaultLocale: en-US
 ManifestType: version
 ManifestVersion: 1.6.0
