@@ -63,10 +63,10 @@ always heard clearly. The players are separate programs, so it stops rather than
 
 | Sound | Plays under |
 | --- | --- |
-| Water: slow waves | `sea`, `waves`, `koi-pond`, `harbour`, `lanterns`, `flood`, `listing-ship`, `broken-bridge`, `leak` and `erosion` |
+| Water: slow waves | `sea`, `waves`, `forest-stream`, `lily-pads`, `koi-pond`, `harbour`, `lanterns`, `mountain-lake`, `tide-pools`, `paper-boats`, `rocket-launch`, `flood`, `listing-ship`, `broken-bridge`, `leak`, `erosion` and `launch-scrub` |
 | Rain: a steady hiss with soft drops | `rain`, `storm` and `tea` |
-| Wind: slow gusts | `snow`, `aurora`, `balloons`, `countryside`, `autumn`, `blossom`, `wilt`, `fog` and `drought` |
-| Fire: a low rumble and soft crackles | `campfire` and `winter-cabin` |
+| Wind: slow gusts | `snow`, `aurora`, `desert-night`, `balloons`, `countryside`, `autumn`, `blossom`, `sunflower-field`, `windmills`, `picnic`, `wilt`, `fog`, `drought`, `rockslide`, `dust-storm`, `thin-ice`, `overgrown`, `drone-landing` and `landing-abort` |
+| Fire: a low rumble and soft crackles | `campfire`, `winter-cabin` and `volcano` |
 | Night: a quiet bed with the odd cricket | Every other scene, your own Lua scenes included |
 
 Each sound is a 20 second loop made by the program from seeded noise, so it is always the same and

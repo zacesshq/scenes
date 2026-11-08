@@ -1,4 +1,4 @@
-//! Calm animated scenes for the terminal in the Zacess high contrast themes.
+//! Calm animated scenes for the terminal in the ten Zacess accessible themes.
 //!
 //! The crate is a library so every part can run headless in tests: a scene draws into a
 //! [`frame::Frame`], the frame renders to a string and the terminal layer in [`terminal`] is the
@@ -8,6 +8,7 @@ pub mod ambient;
 pub mod app;
 pub mod catalogue;
 pub mod cli;
+pub mod clock;
 pub mod colour;
 pub mod config;
 pub mod flash;
@@ -18,6 +19,7 @@ pub mod lua;
 pub mod motion;
 pub mod notify;
 pub mod palette;
+pub mod pixels;
 pub mod report;
 pub mod rng;
 pub mod scene;

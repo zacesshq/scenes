@@ -3,18 +3,59 @@
 
 use crate::colour::Rgb;
 
-/// One character cell. `None` for the colour means the terminal's default foreground.
+/// The upper half block. A pixel cell draws it with the top pixel as the foreground and the bottom
+/// pixel as the background.
+pub const HALF_BLOCK: char = '\u{2580}';
+
+/// One character cell. `None` for the colour means the terminal's default foreground and `None`
+/// for the background means the terminal's own background, which every text-only scene keeps.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Cell {
     pub ch: char,
     pub colour: Option<Rgb>,
+    pub bg: Option<Rgb>,
 }
 
 impl Cell {
     pub const BLANK: Cell = Cell {
         ch: ' ',
         colour: None,
+        bg: None,
     };
+
+    /// A cell of two stacked pixels, as the pixel canvas writes it. Two equal pixels become a
+    /// space on that background, which needs no foreground at all.
+    pub fn pixels(top: Rgb, bottom: Rgb) -> Cell {
+        if top == bottom {
+            Cell {
+                ch: ' ',
+                colour: None,
+                bg: Some(bottom),
+            }
+        } else {
+            Cell {
+                ch: HALF_BLOCK,
+                colour: Some(top),
+                bg: Some(bottom),
+            }
+        }
+    }
+
+    /// Whether the cell is imagery from the pixel canvas rather than text. Its colours carry no
+    /// meaning, so they are held to the background imagery rules instead of the text floor.
+    pub fn is_pixel(&self) -> bool {
+        self.bg.is_some() && (self.ch == HALF_BLOCK || self.ch == ' ')
+    }
+
+    /// The top and bottom pixel of a pixel cell.
+    pub fn pixel_pair(&self) -> Option<(Rgb, Rgb)> {
+        let bg = self.bg?;
+        match self.ch {
+            ' ' => Some((bg, bg)),
+            HALF_BLOCK => Some((self.colour.unwrap_or(bg), bg)),
+            _ => None,
+        }
+    }
 }
 
 /// A grid of cells the size of the terminal.
@@ -61,7 +102,18 @@ impl Frame {
     /// the edge while it enters or leaves.
     pub fn put(&mut self, x: i32, y: i32, ch: char, colour: Option<Rgb>) {
         if let Some(i) = self.index(x, y) {
-            self.cells[i] = Cell { ch, colour };
+            self.cells[i] = Cell {
+                ch,
+                colour,
+                bg: None,
+            };
+        }
+    }
+
+    /// Writes a whole cell, background included.
+    pub fn put_cell(&mut self, x: i32, y: i32, cell: Cell) {
+        if let Some(i) = self.index(x, y) {
+            self.cells[i] = cell;
         }
     }
 
@@ -121,17 +173,26 @@ impl Frame {
         out
     }
 
-    /// Every colour drawn in the frame, sorted and without repeats.
+    /// Every text colour drawn in the frame, sorted and without repeats. Pixel cells are left out:
+    /// they are background imagery, not text, so the text floor does not apply to them.
     pub fn colours(&self) -> Vec<Rgb> {
-        let mut used: Vec<Rgb> = self.cells.iter().filter_map(|c| c.colour).collect();
+        let mut used: Vec<Rgb> = self
+            .cells
+            .iter()
+            .filter(|c| !c.is_pixel())
+            .filter_map(|c| c.colour)
+            .collect();
         used.sort_unstable();
         used.dedup();
         used
     }
 
-    /// How many cells hold something other than a space.
+    /// How many cells hold something other than a blank space.
     pub fn drawn(&self) -> usize {
-        self.cells.iter().filter(|c| c.ch != ' ').count()
+        self.cells
+            .iter()
+            .filter(|c| c.ch != ' ' || c.bg.is_some())
+            .count()
     }
 }
 
@@ -174,6 +235,22 @@ mod tests {
         assert_eq!(frame.row_text(0), ".a.b..");
         assert_eq!(frame.row_text(1), "  c   ");
         assert_eq!(frame.colours(), vec![Rgb::new(1, 2, 3)]);
+    }
+
+    #[test]
+    fn put_clears_a_background_and_pixel_cells_stay_out_of_the_text_colours() {
+        let mut frame = Frame::new(3, 1);
+        let (a, b) = (Rgb::new(1, 2, 3), Rgb::new(4, 5, 6));
+        frame.put_cell(0, 0, Cell::pixels(a, b));
+        frame.put_cell(1, 0, Cell::pixels(a, a));
+        frame.put_cell(2, 0, Cell::pixels(a, b));
+        frame.put(2, 0, 'x', Some(b));
+        assert_eq!(frame.get(0, 0).unwrap().ch, HALF_BLOCK);
+        assert_eq!(frame.get(1, 0).unwrap().ch, ' ');
+        assert_eq!(frame.get(1, 0).unwrap().pixel_pair(), Some((a, a)));
+        assert_eq!(frame.get(2, 0).unwrap().bg, None);
+        assert_eq!(frame.colours(), vec![b]);
+        assert_eq!(frame.drawn(), 3);
     }
 
     #[test]

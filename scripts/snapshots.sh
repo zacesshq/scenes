@@ -32,5 +32,5 @@ done
 
 for scene in koi-pond lanterns tea constellations fog traffic-jam drought zacess; do
   "$bin" snapshot "$scene" --theme deep-contrast-dark --size 80x24 --time 6 --seed 1 \
-    --frames 72 --fps 12 --out "$frames/$scene.json"
+    --frames 36 --fps 6 --out "$frames/$scene.json"
 done

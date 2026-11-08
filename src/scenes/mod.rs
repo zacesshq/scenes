@@ -14,29 +14,57 @@ pub mod code_rain;
 pub mod constellations;
 pub mod corrosion;
 pub mod countryside;
+pub mod dead_led;
+pub mod desert_night;
+pub mod drone_landing;
 pub mod drought;
+pub mod dust_storm;
 pub mod erosion;
 pub mod fireflies;
 pub mod flood;
 pub mod fog;
+pub mod forest_stream;
 pub mod garden;
 pub mod harbour;
+pub mod kettle_boil;
+pub mod kettle_cold;
 pub mod koi_pond;
+pub mod landing_abort;
 pub mod lanterns;
+pub mod launch_scrub;
 pub mod leak;
+pub mod lily_pads;
 pub mod listing_ship;
+pub mod mountain_lake;
 pub mod orbit;
+pub mod overgrown;
+pub(crate) mod paint;
+pub mod paper_boats;
+pub mod pcb_bring_up;
+pub mod picnic;
+pub mod pit_stop;
+pub mod pit_stop_stuck;
 pub mod rain;
 pub mod ribbons;
+pub mod rocket_launch;
+pub mod rockslide;
+pub mod rooftops;
 pub mod sea;
+pub mod short_circuit;
 pub mod snow;
 pub mod starfield;
+pub mod storm;
+pub mod sunflower_field;
 pub mod tangle;
 pub mod tea;
+pub mod thin_ice;
+pub mod tide_pools;
 pub mod tiles;
 pub mod traffic_jam;
+pub mod volcano;
 pub mod waves;
 pub mod wilt;
+pub mod windmills;
 pub mod winter_cabin;
 pub mod zacess;
 
@@ -51,7 +79,7 @@ pub enum Kind {
     Pass,
     /// A slow, serious scene that reads as something gone wrong, made for a failing build.
     Fail,
-    /// One of the original scenes, calm enough to show while a build passes.
+    /// A general scene, the original ten among them, calm enough to show while a build passes.
     General,
 }
 
@@ -102,12 +130,12 @@ const fn general(
     }
 }
 
-/// Every scene, in the order the help lists them: the original ten, then the pass scenes, then
-/// the fail scenes.
-pub const SCENES: [SceneInfo; 39] = [
+/// Every scene, in the order the help lists them: the general scenes, the original ten first,
+/// then the pass scenes, then the fail scenes.
+pub const SCENES: [SceneInfo; 65] = [
     general(
         "sea",
-        "Fish of several sizes, bubbles, seaweed, a boat on the surface and an occasional whale",
+        "Fish of three sizes, bubbles, seaweed, a boat on the surface and an occasional whale, under a daylit sky in light themes",
         &[
             "Clean build. The fish approve.",
             "Not a ripple out of place.",
@@ -116,7 +144,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "rain",
-        "Drops and puddle ripples, with distant lightning unless motion is reduced",
+        "Rain on a lamplit evening street with puddles, a walker under an umbrella and distant lightning, an overcast afternoon in light themes",
         &[
             "A soft rain and a clean build.",
             "Nothing to fix. Listen to the rain.",
@@ -125,7 +153,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "snow",
-        "Drifting flakes that settle at the bottom",
+        "Flakes at three depths drifting over far hills and pines, settling into a bank along the bottom, by day in light themes",
         &[
             "Quiet as fresh snow.",
             "A clean run. Settle in.",
@@ -134,7 +162,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "starfield",
-        "Twinkling stars, a crescent moon and a slow shooting star",
+        "Twinkling stars over a faint band of the galaxy and low hills, a crescent moon and a slow shooting star, at dawn in light themes",
         &[
             "The build passed. Make a wish anyway.",
             "Clear skies over the compiler.",
@@ -143,7 +171,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "code-rain",
-        "Falling columns of characters in the theme's syntax colours",
+        "Falling columns of characters in the theme's syntax colours, each with a bright head, over a softly shaded backdrop",
         &[
             "Every column compiles.",
             "The code falls into place.",
@@ -152,7 +180,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "fireflies",
-        "A dark meadow with slow pulsing lights",
+        "Fireflies glowing over a meadow at dusk under a moon and a great tree, by day in light themes with butterflies and flowers",
         &[
             "A quiet meadow and a clean build.",
             "Small lights, no warnings.",
@@ -161,7 +189,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "aurora",
-        "Slow waves of colour across the top of the sky",
+        "Slow curtains of colour across a starry sky over snow-capped mountains, at the blue hour in light themes",
         &[
             "The sky approves of this build.",
             "Green from end to end and then some.",
@@ -170,7 +198,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "campfire",
-        "Flames and embers with a steady glow",
+        "A campfire in a pine clearing, flames over logs in a ring of stones with rising embers, on a late afternoon in light themes",
         &[
             "Pull up a log. The build is fine.",
             "Warm and green.",
@@ -179,7 +207,7 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "waves",
-        "A calm sea horizon with gulls",
+        "A calm sea to the horizon under a sun, with gulls, the sun a pale disc in a warm halo in light themes",
         &[
             "Everything builds. Time to stretch your legs.",
             "A clean run. The borrow checker is content.",
@@ -191,13 +219,37 @@ pub const SCENES: [SceneInfo; 39] = [
     ),
     general(
         "zacess",
-        "The Zacess mark drifting slowly",
+        "The Zacess mark floating slowly round the middle of the screen over a soft wash with two flowing ribbons of colour",
         &[
             "Clean, clear and readable.",
             "A tidy build.",
             "All good on our side.",
         ],
     ),
+    SceneInfo {
+        name: "forest-stream",
+        summary: forest_stream::SUMMARY,
+        kind: Kind::General,
+        captions: forest_stream::CAPTIONS,
+    },
+    SceneInfo {
+        name: "desert-night",
+        summary: desert_night::SUMMARY,
+        kind: Kind::General,
+        captions: desert_night::CAPTIONS,
+    },
+    SceneInfo {
+        name: "rooftops",
+        summary: rooftops::SUMMARY,
+        kind: Kind::General,
+        captions: rooftops::CAPTIONS,
+    },
+    SceneInfo {
+        name: "lily-pads",
+        summary: lily_pads::SUMMARY,
+        kind: Kind::General,
+        captions: lily_pads::CAPTIONS,
+    },
     SceneInfo {
         name: "koi-pond",
         summary: koi_pond::SUMMARY,
@@ -295,14 +347,76 @@ pub const SCENES: [SceneInfo; 39] = [
         captions: ribbons::CAPTIONS,
     },
     SceneInfo {
+        name: "sunflower-field",
+        summary: sunflower_field::SUMMARY,
+        kind: Kind::Pass,
+        captions: sunflower_field::CAPTIONS,
+    },
+    SceneInfo {
+        name: "mountain-lake",
+        summary: mountain_lake::SUMMARY,
+        kind: Kind::Pass,
+        captions: mountain_lake::CAPTIONS,
+    },
+    SceneInfo {
+        name: "tide-pools",
+        summary: tide_pools::SUMMARY,
+        kind: Kind::Pass,
+        captions: tide_pools::CAPTIONS,
+    },
+    SceneInfo {
+        name: "paper-boats",
+        summary: paper_boats::SUMMARY,
+        kind: Kind::Pass,
+        captions: paper_boats::CAPTIONS,
+    },
+    SceneInfo {
+        name: "windmills",
+        summary: windmills::SUMMARY,
+        kind: Kind::Pass,
+        captions: windmills::CAPTIONS,
+    },
+    SceneInfo {
+        name: "picnic",
+        summary: picnic::SUMMARY,
+        kind: Kind::Pass,
+        captions: picnic::CAPTIONS,
+    },
+    SceneInfo {
+        name: "drone-landing",
+        summary: drone_landing::SUMMARY,
+        kind: Kind::Pass,
+        captions: drone_landing::CAPTIONS,
+    },
+    SceneInfo {
+        name: "kettle-boil",
+        summary: kettle_boil::SUMMARY,
+        kind: Kind::Pass,
+        captions: kettle_boil::CAPTIONS,
+    },
+    SceneInfo {
+        name: "rocket-launch",
+        summary: rocket_launch::SUMMARY,
+        kind: Kind::Pass,
+        captions: rocket_launch::CAPTIONS,
+    },
+    SceneInfo {
+        name: "pit-stop",
+        summary: pit_stop::SUMMARY,
+        kind: Kind::Pass,
+        captions: pit_stop::CAPTIONS,
+    },
+    SceneInfo {
+        name: "pcb-bring-up",
+        summary: pcb_bring_up::SUMMARY,
+        kind: Kind::Pass,
+        captions: pcb_bring_up::CAPTIONS,
+    },
+    SceneInfo {
         name: "storm",
-        summary: "Heavy slanting rain under two rows of cloud, with distant lightning unless motion is reduced",
+        summary: storm::SUMMARY,
         kind: Kind::Fail,
-        captions: &[
-            "Something broke. The storm will pass.",
-            "Rough weather in the build.",
-            "Batten down and read the first error.",
-        ],
+        captions: storm::CAPTIONS,
     },
     SceneInfo {
         name: "flood",
@@ -376,6 +490,72 @@ pub const SCENES: [SceneInfo; 39] = [
         kind: Kind::Fail,
         captions: drought::CAPTIONS,
     },
+    SceneInfo {
+        name: "volcano",
+        summary: volcano::SUMMARY,
+        kind: Kind::Fail,
+        captions: volcano::CAPTIONS,
+    },
+    SceneInfo {
+        name: "rockslide",
+        summary: rockslide::SUMMARY,
+        kind: Kind::Fail,
+        captions: rockslide::CAPTIONS,
+    },
+    SceneInfo {
+        name: "dust-storm",
+        summary: dust_storm::SUMMARY,
+        kind: Kind::Fail,
+        captions: dust_storm::CAPTIONS,
+    },
+    SceneInfo {
+        name: "thin-ice",
+        summary: thin_ice::SUMMARY,
+        kind: Kind::Fail,
+        captions: thin_ice::CAPTIONS,
+    },
+    SceneInfo {
+        name: "short-circuit",
+        summary: short_circuit::SUMMARY,
+        kind: Kind::Fail,
+        captions: short_circuit::CAPTIONS,
+    },
+    SceneInfo {
+        name: "overgrown",
+        summary: overgrown::SUMMARY,
+        kind: Kind::Fail,
+        captions: overgrown::CAPTIONS,
+    },
+    SceneInfo {
+        name: "landing-abort",
+        summary: landing_abort::SUMMARY,
+        kind: Kind::Fail,
+        captions: landing_abort::CAPTIONS,
+    },
+    SceneInfo {
+        name: "kettle-cold",
+        summary: kettle_cold::SUMMARY,
+        kind: Kind::Fail,
+        captions: kettle_cold::CAPTIONS,
+    },
+    SceneInfo {
+        name: "launch-scrub",
+        summary: launch_scrub::SUMMARY,
+        kind: Kind::Fail,
+        captions: launch_scrub::CAPTIONS,
+    },
+    SceneInfo {
+        name: "pit-stop-stuck",
+        summary: pit_stop_stuck::SUMMARY,
+        kind: Kind::Fail,
+        captions: pit_stop_stuck::CAPTIONS,
+    },
+    SceneInfo {
+        name: "dead-led",
+        summary: dead_led::SUMMARY,
+        kind: Kind::Fail,
+        captions: dead_led::CAPTIONS,
+    },
 ];
 
 pub fn info(name: &str) -> Option<&'static SceneInfo> {
@@ -402,7 +582,7 @@ pub fn create(
     let scene: Box<dyn Scene> = match name {
         "sea" => Box::new(sea::Sea::new(width, height, motion, rng)),
         "rain" => Box::new(rain::Rain::new(width, height, motion, rng)),
-        "storm" => Box::new(rain::Rain::storm(width, height, motion, rng)),
+        "storm" => Box::new(storm::Storm::new(width, height, motion, rng)),
         "snow" => Box::new(snow::Snow::new(width, height, motion, rng)),
         "starfield" => Box::new(starfield::Starfield::new(width, height, motion, rng)),
         "code-rain" => Box::new(code_rain::CodeRain::new(width, height, motion, rng)),
@@ -429,6 +609,14 @@ pub fn create(
         "garden" => Box::new(garden::Garden::new(width, height, motion, rng)),
         "tiles" => Box::new(tiles::Tiles::new(width, height, motion, rng)),
         "ribbons" => Box::new(ribbons::Ribbons::new(width, height, motion, rng)),
+        "sunflower-field" => Box::new(sunflower_field::SunflowerField::new(
+            width, height, motion, rng,
+        )),
+        "mountain-lake" => Box::new(mountain_lake::MountainLake::new(width, height, motion, rng)),
+        "tide-pools" => Box::new(tide_pools::TidePools::new(width, height, motion, rng)),
+        "paper-boats" => Box::new(paper_boats::PaperBoats::new(width, height, motion, rng)),
+        "windmills" => Box::new(windmills::Windmills::new(width, height, motion, rng)),
+        "picnic" => Box::new(picnic::Picnic::new(width, height, motion, rng)),
         "flood" => Box::new(flood::Flood::new(width, height, motion, rng)),
         "listing-ship" => Box::new(listing_ship::ListingShip::new(width, height, motion, rng)),
         "corrosion" => Box::new(corrosion::Corrosion::new(width, height, motion, rng)),
@@ -441,6 +629,28 @@ pub fn create(
         "traffic-jam" => Box::new(traffic_jam::TrafficJam::new(width, height, motion, rng)),
         "erosion" => Box::new(erosion::Erosion::new(width, height, motion, rng)),
         "drought" => Box::new(drought::Drought::new(width, height, motion, rng)),
+        "volcano" => Box::new(volcano::Volcano::new(width, height, motion, rng)),
+        "rockslide" => Box::new(rockslide::Rockslide::new(width, height, motion, rng)),
+        "dust-storm" => Box::new(dust_storm::DustStorm::new(width, height, motion, rng)),
+        "thin-ice" => Box::new(thin_ice::ThinIce::new(width, height, motion, rng)),
+        "short-circuit" => Box::new(short_circuit::ShortCircuit::new(width, height, motion, rng)),
+        "overgrown" => Box::new(overgrown::Overgrown::new(width, height, motion, rng)),
+        "forest-stream" => Box::new(forest_stream::ForestStream::new(width, height, motion, rng)),
+        "desert-night" => Box::new(desert_night::DesertNight::new(width, height, motion, rng)),
+        "rooftops" => Box::new(rooftops::Rooftops::new(width, height, motion, rng)),
+        "lily-pads" => Box::new(lily_pads::LilyPads::new(width, height, motion, rng)),
+        "drone-landing" => Box::new(drone_landing::DroneLanding::new(width, height, motion, rng)),
+        "landing-abort" => Box::new(landing_abort::new(width, height, motion, rng)),
+        "kettle-boil" => Box::new(kettle_boil::Kettle::new(width, height, motion, rng)),
+        "kettle-cold" => Box::new(kettle_cold::new(width, height, motion, rng)),
+        "rocket-launch" => Box::new(rocket_launch::RocketLaunch::new(width, height, motion, rng)),
+        "launch-scrub" => Box::new(launch_scrub::LaunchScrub::new(width, height, motion, rng)),
+        "pit-stop" => Box::new(pit_stop::PitStop::new(width, height, motion, rng)),
+        "pit-stop-stuck" => Box::new(pit_stop_stuck::PitStopStuck::new(
+            width, height, motion, rng,
+        )),
+        "pcb-bring-up" => Box::new(pcb_bring_up::PcbBringUp::new(width, height, motion, rng)),
+        "dead-led" => Box::new(dead_led::DeadLed::new(width, height, motion, rng)),
         _ => return None,
     };
     Some(scene)
@@ -475,193 +685,7 @@ pub(crate) fn wrap(value: f32, size: f32) -> f32 {
 }
 
 #[cfg(test)]
-pub(crate) mod testing {
-    //! Checks shared by every scene's tests.
-
-    use super::*;
-    use crate::frame::Frame;
-    use crate::theme;
-
-    /// The sizes every scene must look right at: a phone-sized terminal, a classic terminal, a
-    /// full screen and a very wide display.
-    pub const SIZES: [(usize, usize); 4] = [(20, 8), (80, 24), (120, 40), (200, 60)];
-
-    /// Odd sizes a scene must survive without a panic, smaller than it is meant for included.
-    pub const ODD_SIZES: [(usize, usize); 6] =
-        [(1, 1), (2, 2), (7, 3), (19, 7), (33, 9), (300, 90)];
-
-    /// Steps a scene `frames` times at 20 frames a second and returns the last frame.
-    pub fn render(scene: &mut dyn Scene, width: usize, height: usize, frames: usize) -> Frame {
-        let mut rng = Rng::new(99);
-        let mut frame = Frame::new(width, height);
-        for _ in 0..frames {
-            scene.step(0.05, &mut rng);
-        }
-        frame.clear();
-        scene.draw(&mut frame, theme::default_theme());
-        frame
-    }
-
-    /// Whether a character is safe in every terminal font the program supports: printable ASCII,
-    /// the middle dot, the block and shade characters, the light box drawing lines and the two
-    /// triangles of the Zacess fold, which have a fallback of their own.
-    pub fn safe_glyph(ch: char) -> bool {
-        (' '..='~').contains(&ch)
-            || ch == '\u{b7}'
-            || ('\u{2580}'..='\u{259f}').contains(&ch)
-            || "\u{2500}\u{2502}\u{250c}\u{2510}\u{2514}\u{2518}\u{251c}\u{2524}\u{252c}\u{2534}\u{253c}\u{25e3}\u{25e5}"
-                .contains(ch)
-    }
-
-    /// Checks every colour in one drawn frame against each theme's floor and every character
-    /// against the safe set.
-    fn check_colours(scene: &dyn Scene, frame: &mut Frame, name: &str, size: (usize, usize)) {
-        for theme in theme::all() {
-            frame.clear();
-            scene.draw(frame, theme);
-            assert!(
-                frame.drawn() > 0,
-                "{name} drew nothing at {}x{} in {}",
-                size.0,
-                size.1,
-                theme.name
-            );
-            for colour in frame.colours() {
-                let ratio = theme.contrast_of(colour);
-                assert!(
-                    ratio >= theme.floor(),
-                    "{name} draws {} at {ratio:.2}:1 on {}, below its {}:1 floor",
-                    colour.hex(),
-                    theme.name,
-                    theme.floor()
-                );
-            }
-        }
-        for cell in frame.cells() {
-            assert!(
-                safe_glyph(cell.ch),
-                "{name} draws {:?}, which some terminal fonts lack",
-                cell.ch
-            );
-        }
-    }
-
-    /// Every colour a scene draws, in every theme, keeps that theme's contrast floor on its
-    /// background: every frame of a minute at 80 by 24 at the standard level, long enough for
-    /// lightning, shooting stars and the whale, plus sampled frames at every other size and
-    /// motion setting. The scene also never leaves a frame empty, draws only characters every
-    /// supported font has, survives odd sizes and a resize to one cell and back. It also never
-    /// changes a large area more than three times a second.
-    pub fn check_scene(name: &str) {
-        for &(width, height) in &SIZES {
-            for motion in Motion::ALL {
-                let every_frame = (width, height) == (80, 24) && motion == Motion::FULL;
-                let steps = if every_frame { 60 * 20 } else { 30 * 20 };
-                let mut rng = Rng::new(7);
-                let mut scene = create(name, width, height, motion, &mut rng).expect(name);
-                assert_eq!(scene.name(), name);
-                let mut frame = Frame::new(width, height);
-                for step in 0..steps {
-                    scene.step(0.05, &mut rng);
-                    if every_frame || step % 150 == 0 {
-                        check_colours(scene.as_ref(), &mut frame, name, (width, height));
-                    }
-                }
-                // a resize to something tiny and back must never panic
-                scene.resize(1, 1, &mut rng);
-                scene.step(0.05, &mut rng);
-                scene.draw(&mut Frame::new(1, 1), theme::default_theme());
-                scene.resize(width, height, &mut rng);
-                scene.step(0.05, &mut rng);
-            }
-        }
-        for &(width, height) in &ODD_SIZES {
-            let mut rng = Rng::new(3);
-            let mut scene = create(name, width, height, Motion::LIVELY, &mut rng).expect(name);
-            let mut frame = Frame::new(width, height);
-            for _ in 0..40 {
-                scene.step(0.05, &mut rng);
-                scene.draw(&mut frame, theme::default_theme());
-            }
-        }
-        check_flashes(name);
-    }
-
-    /// Runs a scene for a simulated minute at every motion setting and two sizes, measuring the
-    /// brightness of each region of every frame in the brightest and the darkest theme, and
-    /// fails if any second has more than three large changes.
-    pub fn check_flashes(name: &str) {
-        use crate::flash::{MAX_CHANGES_PER_SECOND, most_changes_per_second, regions};
-        let themes = [
-            theme::by_id("deep-contrast-dark").expect("theme"),
-            theme::by_id("deep-contrast-light").expect("theme"),
-        ];
-        for &(width, height) in &[(40, 12), (100, 30)] {
-            for motion in Motion::ALL {
-                let mut rng = Rng::new(11);
-                let mut scene = create(name, width, height, motion, &mut rng).expect(name);
-                let mut frame = Frame::new(width, height);
-                let mut measured: Vec<Vec<Vec<f32>>> = vec![Vec::new(); themes.len()];
-                for _ in 0..(60 * 20) {
-                    scene.step(0.05, &mut rng);
-                    for (theme, out) in themes.iter().zip(measured.iter_mut()) {
-                        frame.clear();
-                        scene.draw(&mut frame, theme);
-                        out.push(regions(&frame, theme));
-                    }
-                }
-                for (theme, frames) in themes.iter().zip(&measured) {
-                    let most = most_changes_per_second(frames, 20);
-                    assert!(
-                        most <= MAX_CHANGES_PER_SECOND,
-                        "{name} at {width}x{height} with {motion:?} in {} has {most} large \
-                         changes in one second",
-                        theme.name
-                    );
-                }
-            }
-        }
-    }
-
-    /// The most times any one cell changes within one second of `frames` drawn at `fps`.
-    pub fn max_changes_per_second(frames: &[Frame], fps: usize) -> usize {
-        let Some(first) = frames.first() else {
-            return 0;
-        };
-        let mut most = 0;
-        for y in 0..first.height() as i32 {
-            for x in 0..first.width() as i32 {
-                let changes: Vec<usize> = (1..frames.len())
-                    .filter(|&i| frames[i].get(x, y) != frames[i - 1].get(x, y))
-                    .collect();
-                let mut start = 0;
-                for end in 0..changes.len() {
-                    while changes[end] - changes[start] >= fps {
-                        start += 1;
-                    }
-                    most = most.max(end - start + 1);
-                }
-            }
-        }
-        most
-    }
-
-    /// The same seed draws the same frame.
-    pub fn check_determinism(name: &str) {
-        let mut frames = Vec::new();
-        for _ in 0..2 {
-            let mut rng = Rng::new(2024);
-            let mut scene = create(name, 60, 20, Motion::FULL, &mut rng).expect(name);
-            let mut frame = Frame::new(60, 20);
-            for _ in 0..50 {
-                scene.step(0.05, &mut rng);
-            }
-            scene.draw(&mut frame, theme::default_theme());
-            frames.push(frame.to_text());
-        }
-        assert_eq!(frames[0], frames[1], "{name} is not deterministic");
-    }
-}
+pub(crate) mod testing;
 
 #[cfg(test)]
 mod tests {

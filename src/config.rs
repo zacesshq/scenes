@@ -2,9 +2,9 @@
 //! with the flags, the environment variables and the defaults: a flag wins, then a variable,
 //! then the file, then the default.
 //!
-//! The file is read by a small parser of our own for the part of TOML it needs: tables, bare
-//! keys, strings, whole and decimal numbers, booleans and arrays, with comments anywhere a line
-//! allows. Pulling in a full TOML library for a dozen settings would more than double the
+//! The file is read by a small built-in parser that covers only the part of TOML it needs:
+//! tables, bare keys, strings, whole and decimal numbers, booleans and arrays, with comments
+//! anywhere a line allows. Pulling in a full TOML library for a dozen settings would more than double the
 //! dependencies the program builds.
 
 use std::collections::BTreeMap;

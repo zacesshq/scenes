@@ -11,7 +11,7 @@ use std::time::Duration;
 
 use crossterm::cursor;
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
-use crossterm::style::{Color, Print, ResetColor, SetForegroundColor};
+use crossterm::style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor};
 use crossterm::terminal::{
     self, BeginSynchronizedUpdate, Clear, ClearType, EndSynchronizedUpdate, EnterAlternateScreen,
     LeaveAlternateScreen,
@@ -19,7 +19,7 @@ use crossterm::terminal::{
 use crossterm::{execute, queue};
 
 use crate::colour::{ColourDepth, Rgb, nearest_256};
-use crate::frame::Frame;
+use crate::frame::{Cell, Frame};
 
 /// Whether the terminal is currently taken over, so it is restored exactly once.
 static ACTIVE: AtomicBool = AtomicBool::new(false);
@@ -162,14 +162,196 @@ pub struct Paint {
     pub floor: f64,
 }
 
-/// A taken-over terminal. Dropping it gives the terminal back.
-pub struct Terminal {
+/// Turns frames into the bytes that draw them: only the cells that changed since the last frame,
+/// and a colour escape only when the foreground or background actually changes. It needs no
+/// terminal, so its output can be tested.
+#[derive(Debug, Default)]
+pub struct Encoder {
     /// One frame's output, written in a single call so a slow terminal never shows half a frame.
     buffer: Vec<u8>,
     previous: Option<Frame>,
-    colour: Option<Option<Rgb>>,
+    /// The foreground and background the terminal is known to be on, `None` when unknown.
+    fg: Option<Option<Rgb>>,
+    bg: Option<Option<Rgb>>,
     paint: Option<Paint>,
     mapped: HashMap<Rgb, u8>,
+    /// Pixel colours mapped to the 256 colour table, which keep no text floor.
+    mapped_pixels: HashMap<Rgb, u8>,
+}
+
+impl Encoder {
+    pub fn new() -> Self {
+        Self {
+            buffer: Vec::with_capacity(64 * 1024),
+            ..Self::default()
+        }
+    }
+
+    /// Sets how colours are sent. Without a call every colour is sent as 24 bit colour.
+    pub fn set_paint(&mut self, paint: Paint) {
+        self.paint = Some(paint);
+        self.mapped.clear();
+        self.mapped_pixels.clear();
+    }
+
+    /// Forgets the last frame and the colours, so the next frame repaints everything.
+    pub fn forget(&mut self) {
+        self.previous = None;
+        self.fg = None;
+        self.bg = None;
+    }
+
+    /// The bytes of the last encoded frame.
+    pub fn bytes(&self) -> &[u8] {
+        &self.buffer
+    }
+
+    fn depth_256(&self) -> Option<Paint> {
+        self.paint.filter(|p| p.depth == ColourDepth::Ansi256)
+    }
+
+    /// A colour as the terminal gets it. Text keeps the floor in the 256 colour table; pixel
+    /// imagery takes the nearest entry, since it carries no text and keeps no floor.
+    fn terminal_colour(&mut self, c: Rgb, pixel: bool) -> Color {
+        match self.depth_256() {
+            Some(paint) => {
+                let index = if pixel {
+                    *self
+                        .mapped_pixels
+                        .entry(c)
+                        .or_insert_with(|| pixel_256(c, paint.background))
+                } else {
+                    *self
+                        .mapped
+                        .entry(c)
+                        .or_insert_with(|| nearest_256(c, paint.background, paint.floor))
+                };
+                Color::AnsiValue(index)
+            }
+            None => Color::Rgb {
+                r: c.r,
+                g: c.g,
+                b: c.b,
+            },
+        }
+    }
+
+    /// Brings the terminal to a foreground and background. `fg` of `None` inside `Some` means
+    /// the default; a plain `None` means any foreground will do, as for a space. A reset is the
+    /// only way back to a default; it clears both, so it comes first.
+    fn set_colours(
+        &mut self,
+        fg: Option<Option<Rgb>>,
+        bg: Option<Rgb>,
+        pixel: bool,
+    ) -> io::Result<()> {
+        let fg_needs_reset = fg == Some(None) && self.fg != Some(None);
+        let bg_needs_reset = bg.is_none() && self.bg != Some(None);
+        if fg_needs_reset || bg_needs_reset {
+            queue!(self.buffer, ResetColor)?;
+            self.fg = Some(None);
+            self.bg = Some(None);
+        }
+        if let Some(wanted) = fg.filter(|&w| self.fg != Some(w)) {
+            if let Some(c) = wanted {
+                let colour = self.terminal_colour(c, pixel);
+                queue!(self.buffer, SetForegroundColor(colour))?;
+            }
+            self.fg = Some(wanted);
+        }
+        if self.bg != Some(bg) {
+            if let Some(c) = bg {
+                let colour = self.terminal_colour(c, true);
+                queue!(self.buffer, SetBackgroundColor(colour))?;
+            }
+            self.bg = Some(bg);
+        }
+        Ok(())
+    }
+
+    /// What one cell is printed as: its character, the foreground it needs (`None` for any) and
+    /// its background. With colour off a pixel cell keeps only the outline of its shapes.
+    fn plan(&self, cell: Cell, colour: bool) -> (char, Option<Option<Rgb>>, Option<Rgb>) {
+        if !colour {
+            if let Some((top, bottom)) = cell.pixel_pair() {
+                let background = self.paint.map_or(Rgb::new(0, 0, 0), |p| p.background);
+                let ch = crate::pixels::plain_glyph(top, bottom, background);
+                return (ch, Some(None), None);
+            }
+            return (cell.ch, Some(None), None);
+        }
+        if cell.is_pixel() && self.depth_256().is_some() {
+            // two pixels that land on one table entry print as a plain space of it
+            if let Some((top, bottom)) = cell.pixel_pair() {
+                let background = self.paint.map_or(Rgb::new(0, 0, 0), |p| p.background);
+                if pixel_256(top, background) == pixel_256(bottom, background) {
+                    return (' ', None, Some(bottom));
+                }
+            }
+        }
+        if cell.ch == ' ' && cell.bg.is_some() {
+            return (' ', None, cell.bg);
+        }
+        (cell.ch, Some(cell.colour), cell.bg)
+    }
+
+    /// Encodes the cells that changed since the last frame and returns whether any did. With
+    /// `colour` off every cell uses the terminal's own text colour.
+    pub fn encode(&mut self, frame: &Frame, colour: bool) -> io::Result<bool> {
+        self.buffer.clear();
+        queue!(self.buffer, BeginSynchronizedUpdate)?;
+        let mut changed = false;
+        // where the cursor is known to be after the last print, if anywhere
+        let mut cursor_at: Option<(usize, usize)> = None;
+        for (y, row) in frame.rows().enumerate() {
+            for (x, cell) in row.iter().enumerate() {
+                // the last cell is skipped: printing there makes some terminals scroll
+                if x + 1 == frame.width() && y + 1 == frame.height() {
+                    continue;
+                }
+                let unchanged = self
+                    .previous
+                    .as_ref()
+                    .is_some_and(|p| p.get(x as i32, y as i32) == Some(*cell));
+                if unchanged {
+                    continue;
+                }
+                if cursor_at != Some((x, y)) {
+                    queue!(self.buffer, cursor::MoveTo(x as u16, y as u16))?;
+                }
+                let (ch, fg, bg) = self.plan(*cell, colour);
+                self.set_colours(fg, bg, cell.is_pixel())?;
+                queue!(self.buffer, Print(ch))?;
+                changed = true;
+                // block and shade characters are ambiguous width, two columns in some
+                // terminals, so the cursor is only trusted to advance by one after ASCII
+                cursor_at = ch.is_ascii().then_some((x + 1, y));
+            }
+        }
+        self.previous = Some(frame.clone());
+        if !changed {
+            return Ok(false);
+        }
+        // the background goes back to the terminal's own, so nothing outside a frame, such as
+        // the line printed after quitting, ever picks up a scene's colour
+        if self.bg != Some(None) {
+            queue!(self.buffer, ResetColor)?;
+            self.fg = Some(None);
+            self.bg = Some(None);
+        }
+        queue!(self.buffer, cursor::MoveTo(0, 0), EndSynchronizedUpdate)?;
+        Ok(true)
+    }
+}
+
+/// The 256 colour table entry for a pixel: simply the nearest, since imagery keeps no floor.
+pub fn pixel_256(colour: Rgb, background: Rgb) -> u8 {
+    nearest_256(colour, background, 1.0)
+}
+
+/// A taken-over terminal. Dropping it gives the terminal back.
+pub struct Terminal {
+    encoder: Encoder,
     /// An input read while draining queued resizes, handed out by the next poll.
     pending: Option<Input>,
     /// Set by a termination signal, so the run loop ends and the terminal is restored.
@@ -205,11 +387,7 @@ impl Terminal {
             previous_hook(info);
         }));
         Ok(Self {
-            buffer: Vec::with_capacity(64 * 1024),
-            previous: None,
-            colour: None,
-            paint: None,
-            mapped: HashMap::new(),
+            encoder: Encoder::new(),
             pending: None,
             stop,
             keys: interpret,
@@ -218,8 +396,7 @@ impl Terminal {
 
     /// Sets how colours are sent. Without a call every colour is sent as 24 bit colour.
     pub fn set_paint(&mut self, paint: Paint) {
-        self.paint = Some(paint);
-        self.mapped.clear();
+        self.encoder.set_paint(paint);
     }
 
     /// Sets how keys are read.
@@ -234,77 +411,18 @@ impl Terminal {
 
     /// Clears the screen and forgets the last frame, so the next draw repaints everything.
     pub fn reset(&mut self) -> io::Result<()> {
-        self.previous = None;
-        self.colour = None;
-        execute!(io::stdout(), Clear(ClearType::All))
-    }
-
-    fn set_colour(&mut self, wanted: Option<Rgb>) -> io::Result<()> {
-        match wanted {
-            None => queue!(self.buffer, ResetColor),
-            Some(c) => {
-                let colour = match self.paint {
-                    Some(paint) if paint.depth == ColourDepth::Ansi256 => {
-                        let index = *self
-                            .mapped
-                            .entry(c)
-                            .or_insert_with(|| nearest_256(c, paint.background, paint.floor));
-                        Color::AnsiValue(index)
-                    }
-                    _ => Color::Rgb {
-                        r: c.r,
-                        g: c.g,
-                        b: c.b,
-                    },
-                };
-                queue!(self.buffer, SetForegroundColor(colour))
-            }
-        }
+        self.encoder.forget();
+        execute!(io::stdout(), ResetColor, Clear(ClearType::All))
     }
 
     /// Writes the cells that changed since the last frame and returns whether any did. With
     /// `colour` off every cell uses the terminal's own text colour.
     pub fn draw(&mut self, frame: &Frame, colour: bool) -> io::Result<bool> {
-        self.buffer.clear();
-        queue!(self.buffer, BeginSynchronizedUpdate)?;
-        let mut changed = false;
-        // where the cursor is known to be after the last print, if anywhere
-        let mut cursor_at: Option<(usize, usize)> = None;
-        for (y, row) in frame.rows().enumerate() {
-            for (x, cell) in row.iter().enumerate() {
-                // the last cell is skipped: printing there makes some terminals scroll
-                if x + 1 == frame.width() && y + 1 == frame.height() {
-                    continue;
-                }
-                let unchanged = self
-                    .previous
-                    .as_ref()
-                    .is_some_and(|p| p.get(x as i32, y as i32) == Some(*cell));
-                if unchanged {
-                    continue;
-                }
-                if cursor_at != Some((x, y)) {
-                    queue!(self.buffer, cursor::MoveTo(x as u16, y as u16))?;
-                }
-                let wanted = if colour { cell.colour } else { None };
-                if self.colour != Some(wanted) {
-                    self.set_colour(wanted)?;
-                    self.colour = Some(wanted);
-                }
-                queue!(self.buffer, Print(cell.ch))?;
-                changed = true;
-                // block and shade characters are ambiguous width, two columns in some
-                // terminals, so the cursor is only trusted to advance by one after ASCII
-                cursor_at = cell.ch.is_ascii().then_some((x + 1, y));
-            }
-        }
-        self.previous = Some(frame.clone());
-        if !changed {
+        if !self.encoder.encode(frame, colour)? {
             return Ok(false);
         }
-        queue!(self.buffer, cursor::MoveTo(0, 0), EndSynchronizedUpdate)?;
         let mut out = io::stdout().lock();
-        out.write_all(&self.buffer)?;
+        out.write_all(self.encoder.bytes())?;
         out.flush()?;
         Ok(true)
     }
@@ -503,6 +621,100 @@ mod tests {
         if !cfg!(windows) {
             assert!(!limited_font(term("xterm-256color")));
         }
+    }
+
+    fn encoded(encoder: &mut Encoder, frame: &Frame, colour: bool) -> String {
+        encoder.encode(frame, colour).unwrap();
+        String::from_utf8(encoder.bytes().to_vec()).unwrap()
+    }
+
+    fn pixel_row(colours: &[(Rgb, Rgb)]) -> Frame {
+        let mut frame = Frame::new(colours.len() + 1, 2);
+        for (x, &(top, bottom)) in colours.iter().enumerate() {
+            frame.put_cell(x as i32, 0, Cell::pixels(top, bottom));
+        }
+        frame
+    }
+
+    #[test]
+    fn pixel_cells_send_a_background_only_when_it_changes() {
+        let (a, b) = (Rgb::new(1, 2, 3), Rgb::new(40, 50, 60));
+        let frame = pixel_row(&[(a, b), (a, b), (a, b), (b, b)]);
+        let mut encoder = Encoder::new();
+        let out = encoded(&mut encoder, &frame, true);
+        assert_eq!(out.matches("\u{1b}[48;2;40;50;60m").count(), 1, "{out:?}");
+        assert_eq!(out.matches("\u{1b}[38;2;1;2;3m").count(), 1, "{out:?}");
+        assert_eq!(out.matches('\u{2580}').count(), 3);
+        // the fourth cell is one colour, so it is a space on the same background, with no escape
+        assert!(out.contains("\u{1b}[1;4H \u{1b}[0m"), "{out:?}");
+        // the background is handed back before anything else is printed
+        let last_bg = out.rfind("[48;").unwrap();
+        assert!(out[last_bg..].contains("\u{1b}[0m"), "{out:?}");
+        // nothing changed, nothing is sent
+        assert!(!encoder.encode(&frame, true).unwrap());
+    }
+
+    #[test]
+    fn text_after_a_pixel_cell_resets_the_background() {
+        let (a, b) = (Rgb::new(1, 2, 3), Rgb::new(40, 50, 60));
+        let mut frame = pixel_row(&[(a, b)]);
+        frame.put(1, 0, 'x', None);
+        let out = encoded(&mut Encoder::new(), &frame, true);
+        let pixel = out.find('\u{2580}').unwrap();
+        let reset = out[pixel..].find("\u{1b}[0m").map(|i| i + pixel).unwrap();
+        assert!(reset < out.find('x').unwrap(), "{out:?}");
+    }
+
+    #[test]
+    fn text_only_frames_never_send_a_background() {
+        let mut frame = Frame::new(10, 2);
+        frame.put_str(0, 0, "abc", Some(Rgb::new(255, 255, 0)));
+        frame.put_str(4, 0, "de", None);
+        let out = encoded(&mut Encoder::new(), &frame, true);
+        assert!(!out.contains("[48;"), "{out:?}");
+        assert_eq!(out.matches("38;2;255;255;0m").count(), 1);
+    }
+
+    #[test]
+    fn the_256_colour_table_takes_the_nearest_entry_for_pixels() {
+        let theme = crate::theme::default_theme();
+        let mut encoder = Encoder::new();
+        encoder.set_paint(Paint {
+            depth: ColourDepth::Ansi256,
+            background: theme.background,
+            floor: theme.floor(),
+        });
+        let dark = Rgb::new(0, 0, 40);
+        let frame = pixel_row(&[(theme.yellow(), dark), (dark, Rgb::new(0, 0, 41))]);
+        let out = encoded(&mut encoder, &frame, true);
+        assert!(!out.contains("38;2;") && !out.contains("48;2;"), "{out:?}");
+        let index = pixel_256(dark, theme.background);
+        assert!(out.contains(&format!("48;5;{index}m")), "{out:?}");
+        // the second cell's two pixels share an entry, so it is a plain space
+        assert_eq!(out.matches('\u{2580}').count(), 1, "{out:?}");
+    }
+
+    #[test]
+    fn without_colour_pixels_keep_only_their_shapes() {
+        let theme = crate::theme::default_theme();
+        let mut encoder = Encoder::new();
+        encoder.set_paint(Paint {
+            depth: ColourDepth::TrueColour,
+            background: theme.background,
+            floor: theme.floor(),
+        });
+        let ground = Rgb::new(0, 0, 40);
+        let frame = pixel_row(&[
+            (ground, ground),
+            (theme.yellow(), ground),
+            (ground, theme.red()),
+        ]);
+        let out = encoded(&mut encoder, &frame, false);
+        assert!(!out.contains("38;") && !out.contains("48;"), "{out:?}");
+        let blank = out.find("[0m ").unwrap();
+        let upper = out.find('\u{2580}').unwrap();
+        let lower = out.find('\u{2584}').unwrap();
+        assert!(blank < upper && upper < lower, "{out:?}");
     }
 
     #[test]

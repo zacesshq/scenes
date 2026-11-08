@@ -1,12 +1,20 @@
 //! Code rain: columns of characters fall down the screen, each in one of the theme's syntax
-//! colours with a bright head.
+//! colours with a bright head, over a softly shaded backdrop painted in pixels.
+//!
+//! The characters are text, so they keep the theme's floor against the backdrop under them: the
+//! backdrop is the strongest tint every text colour still clears. Each column's head throws a
+//! faint glow on the cell below it and its tail fades away into the backdrop in pixels; the glow
+//! and the fade are tints held below the non-text floor, so they read as background.
 
-use crate::frame::Frame;
+use crate::colour::Rgb;
+use crate::frame::{Cell, Frame};
+use crate::pixels::{Canvas, IMAGERY_CEILING, Ramp, Shades};
 use crate::rng::Rng;
 use crate::scene::{Motion, Scene};
 use crate::theme::ThemeData;
 
 const GLYPHS: &[u8] = b"01ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz<>{}[]()=+-*/%#@$&!?;:";
+const BACKDROP_STEPS: usize = 6;
 
 #[derive(Clone, Debug)]
 struct Column {
@@ -22,6 +30,50 @@ struct Column {
 
 /// The fastest a column falls under reduced motion, in rows a second.
 pub const CALM_MAX_SPEED: f32 = 3.0;
+
+/// The colours of the code rain in one theme, every one derived from the theme's own.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug)]
+pub(crate) struct RainColours {
+    pub head: Rgb,
+    pub glow: Rgb,
+    /// The backdrop from the top of the screen to the bottom, every step safe under text.
+    backdrop: Ramp,
+    /// For each syntax colour, its tail's two fading steps.
+    fades: Vec<[Rgb; 2]>,
+}
+
+impl RainColours {
+    pub(crate) fn new(theme: &ThemeData) -> Self {
+        let shades = Shades::new(theme);
+        let mut text: Vec<Rgb> = theme.syntax.to_vec();
+        text.push(theme.bright());
+        let floor = theme.floor();
+        let top = shades.under_text(theme.comment(), 0.3, &text, floor);
+        let backdrop = Ramp::new(top, theme.background, BACKDROP_STEPS);
+        let fades = theme
+            .syntax
+            .iter()
+            .map(|&colour| {
+                [
+                    shades.tint(colour, 0.5, IMAGERY_CEILING - 0.3),
+                    shades.tint(colour, 0.25, 1.6),
+                ]
+            })
+            .collect();
+        Self {
+            head: theme.bright(),
+            glow: shades.tint(theme.bright(), 0.35, 2.0),
+            backdrop,
+            fades,
+        }
+    }
+
+    /// The backdrop at a pixel row, `t` from 0 at the top to 1 at the bottom.
+    fn backdrop(&self, t: f32) -> Rgb {
+        self.backdrop.at(t)
+    }
+}
 
 pub struct CodeRain {
     width: usize,
@@ -71,6 +123,12 @@ impl CodeRain {
             rng.range(0.0, self.height as f32)
         };
         column.active = true;
+    }
+
+    /// The backdrop colour under a cell row: the bottom pixel's, which is what text sits on.
+    fn row_backdrop(&self, c: &RainColours, row: i32) -> Rgb {
+        let tall = (self.height * 2) as f32;
+        c.backdrop((row * 2 + 1) as f32 / tall)
     }
 }
 
@@ -133,6 +191,28 @@ impl Scene for CodeRain {
     }
 
     fn draw(&self, frame: &mut Frame, theme: &ThemeData) {
+        let c = RainColours::new(theme);
+        let mut canvas = Canvas::for_frame(frame, theme.background);
+        let tall = canvas.height() as i32;
+        for y in 0..tall {
+            canvas.fill_row(y, c.backdrop(y as f32 / tall.max(1) as f32));
+        }
+        // the pixel parts of each column: the fading tail and the glow ahead of the head
+        for (x, column) in self.columns.iter().enumerate() {
+            if !column.active {
+                continue;
+            }
+            let x = x as i32;
+            let head = column.head.floor() as i32;
+            let [near, far] = c.fades[column.colour % c.fades.len()];
+            let tail = head - column.length as i32 + 1;
+            canvas.fill_rect(x, (tail + 1) * 2, 1, 2, near);
+            canvas.set(x, tail * 2 + 1, far);
+            canvas.set(x, (head + 1) * 2, c.glow);
+        }
+        canvas.blit(frame);
+
+        // the characters, on the backdrop of their own row
         for (x, column) in self.columns.iter().enumerate() {
             if !column.active {
                 continue;
@@ -141,17 +221,20 @@ impl Scene for CodeRain {
             let head = column.head.floor() as i32;
             for (i, ch) in column.chars.iter().enumerate() {
                 let y = head - i as i32;
-                if y < 0 || y >= self.height as i32 {
+                // the last two characters have faded into the pixels painted above
+                if y < 0 || y >= self.height as i32 || i + 2 >= column.length {
                     continue;
                 }
-                let colour = if i == 0 {
-                    theme.bright()
-                } else if i + 2 >= column.length {
-                    theme.grey()
-                } else {
-                    colour
-                };
-                frame.put(x as i32, y, *ch, Some(colour));
+                let colour = if i == 0 { c.head } else { colour };
+                frame.put_cell(
+                    x as i32,
+                    y,
+                    Cell {
+                        ch: *ch,
+                        colour: Some(colour),
+                        bg: Some(self.row_backdrop(&c, y)),
+                    },
+                );
             }
         }
     }
@@ -160,13 +243,47 @@ impl Scene for CodeRain {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scenes::testing::{check_determinism, check_scene, render};
+    use crate::scenes::testing::{check_determinism, check_pixel_scene, check_scene, render};
     use crate::theme;
 
     #[test]
     fn passes_the_shared_checks() {
         check_scene("code-rain");
         check_determinism("code-rain");
+        check_pixel_scene("code-rain", 6.0);
+    }
+
+    #[test]
+    fn the_backdrop_keeps_every_text_colour_on_its_floor_in_every_theme() {
+        for theme in theme::all() {
+            let c = RainColours::new(theme);
+            for t in [0.0, 0.3, 0.6, 1.0] {
+                let backdrop = c.backdrop(t);
+                assert!(
+                    theme.contrast_of(backdrop) < IMAGERY_CEILING,
+                    "{}",
+                    theme.name
+                );
+                for &colour in theme.syntax.iter().chain([&c.head]) {
+                    assert!(
+                        colour.contrast(backdrop) >= theme.floor(),
+                        "{} on {} in {}",
+                        colour.hex(),
+                        backdrop.hex(),
+                        theme.name
+                    );
+                }
+            }
+            for [near, far] in &c.fades {
+                assert!(theme.contrast_of(*near) < IMAGERY_CEILING, "{}", theme.name);
+                assert!(theme.contrast_of(*far) < IMAGERY_CEILING, "{}", theme.name);
+            }
+            assert!(
+                theme.contrast_of(c.glow) < IMAGERY_CEILING,
+                "{}",
+                theme.name
+            );
+        }
     }
 
     #[test]
@@ -181,6 +298,20 @@ mod tests {
         assert!(
             colours.iter().filter(|c| theme.syntax.contains(c)).count() >= 2,
             "{colours:?}"
+        );
+        // the characters sit on the backdrop, never on a hole cut out of it
+        let text = frame
+            .cells()
+            .iter()
+            .filter(|cell| !cell.is_pixel() && cell.ch != ' ')
+            .count();
+        assert!(text > 30);
+        assert!(
+            frame
+                .cells()
+                .iter()
+                .filter(|cell| !cell.is_pixel())
+                .all(|cell| cell.bg.is_some())
         );
         let heads_before: Vec<f32> = rain.columns.iter().map(|c| c.head).collect();
         rain.step(0.5, &mut rng);

@@ -53,12 +53,12 @@ line says so.
 | --- | --- |
 | `--theme <name>` | A Zacess theme by id, short name or full name, such as `deep-contrast-dark`, `deep-dark` or `Zacess Deep Contrast Dark` |
 | `--scene <name>` | The scene, as an alternative to naming it first |
-| `--motion <level>` | `calm`, `standard` or `lively`. Lively is faster and busier but never changes anything in place faster than standard |
+| `--motion <level>` | `calm`, `standard` or `lively`. Lively is faster and busier, while pulses, flickers and lights that change in place keep the standard pace |
 | `--list-themes` | Prints the themes and marks the one that would be used |
 | `--list-scenes` | Prints the scenes |
 | `--fps <n>` | Frames per second, 1 to 30. The default is 20 |
 | `--slow` | Half speed |
-| `--reduced-motion` | Fewer and slower movements, no lightning and no flicker, at most 12 frames a second |
+| `--reduced-motion` | Every movement at half speed or slower, no lightning, slower flicker and at most 12 frames a second |
 | `--duration <minutes>` | Stops after this many minutes, decimals allowed |
 | `--shuffle` | Moves to another scene at random every few minutes, 5 unless `--every` or the config says otherwise |
 | `--every <minutes>` | Minutes between scenes, decimals allowed. On its own it moves through the list in order |

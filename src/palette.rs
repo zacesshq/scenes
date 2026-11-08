@@ -3,7 +3,7 @@
 use crate::colour::Rgb;
 
 /// The version of the Zacess palette these colours come from.
-pub const PALETTE_VERSION: &str = "0.5.0";
+pub const PALETTE_VERSION: &str = "1.0.0";
 
 /// One Zacess theme: the interface and terminal colours a scene can draw with.
 #[derive(Debug)]
@@ -14,6 +14,9 @@ pub struct ThemeData {
     pub name: &'static str,
     /// True for a dark background.
     pub dark: bool,
+    /// The contrast text keeps against the background in this theme, from the palette's
+    /// `textContrast` rule or the theme's own value where it sets one.
+    pub text_contrast: f64,
     pub background: Rgb,
     pub foreground: Rgb,
     pub muted: Rgb,
@@ -31,11 +34,12 @@ pub struct ThemeData {
 }
 
 /// Every Zacess theme, in the palette's order.
-pub const THEMES: [ThemeData; 8] = [
+pub const THEMES: &[ThemeData] = &[
     ThemeData {
         id: "light",
         name: "Zacess Light",
         dark: false,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0xffffff),
         foreground: Rgb::from_hex(0x111111),
         muted: Rgb::from_hex(0x424242),
@@ -43,7 +47,7 @@ pub const THEMES: [ThemeData; 8] = [
         link: Rgb::from_hex(0x0049a3),
         cursor: Rgb::from_hex(0x111111),
         error: Rgb::from_hex(0x810005),
-        warning: Rgb::from_hex(0x583600),
+        warning: Rgb::from_hex(0x843800),
         info: Rgb::from_hex(0x003a84),
         syntax: [
             Rgb::from_hex(0x59029f),
@@ -79,6 +83,7 @@ pub const THEMES: [ThemeData; 8] = [
         id: "dark",
         name: "Zacess Dark",
         dark: true,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0x121212),
         foreground: Rgb::from_hex(0xf5f5f5),
         muted: Rgb::from_hex(0xc8c8c8),
@@ -86,7 +91,7 @@ pub const THEMES: [ThemeData; 8] = [
         link: Rgb::from_hex(0x8cbcff),
         cursor: Rgb::from_hex(0xffd400),
         error: Rgb::from_hex(0xffccc4),
-        warning: Rgb::from_hex(0xffd182),
+        warning: Rgb::from_hex(0xedc071),
         info: Rgb::from_hex(0xbddaff),
         syntax: [
             Rgb::from_hex(0xd3bdff),
@@ -122,6 +127,7 @@ pub const THEMES: [ThemeData; 8] = [
         id: "yellow-on-black",
         name: "Zacess Yellow on Black",
         dark: true,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0x000000),
         foreground: Rgb::from_hex(0xffeb3b),
         muted: Rgb::from_hex(0xe6e6e6),
@@ -165,6 +171,7 @@ pub const THEMES: [ThemeData; 8] = [
         id: "cream",
         name: "Zacess Cream",
         dark: false,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0xfdf6e3),
         foreground: Rgb::from_hex(0x000000),
         muted: Rgb::from_hex(0x3f382c),
@@ -172,7 +179,7 @@ pub const THEMES: [ThemeData; 8] = [
         link: Rgb::from_hex(0x004498),
         cursor: Rgb::from_hex(0x000000),
         error: Rgb::from_hex(0x770004),
-        warning: Rgb::from_hex(0x513100),
+        warning: Rgb::from_hex(0x803200),
         info: Rgb::from_hex(0x00357a),
         syntax: [
             Rgb::from_hex(0x530093),
@@ -208,6 +215,7 @@ pub const THEMES: [ThemeData; 8] = [
         id: "high-contrast-dark",
         name: "Zacess High Contrast Dark",
         dark: true,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0x000000),
         foreground: Rgb::from_hex(0xffffff),
         muted: Rgb::from_hex(0xe0e0e0),
@@ -251,6 +259,7 @@ pub const THEMES: [ThemeData; 8] = [
         id: "high-contrast-light",
         name: "Zacess High Contrast Light",
         dark: false,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0xffffff),
         foreground: Rgb::from_hex(0x000000),
         muted: Rgb::from_hex(0x2e2e2e),
@@ -258,7 +267,7 @@ pub const THEMES: [ThemeData; 8] = [
         link: Rgb::from_hex(0x003d99),
         cursor: Rgb::from_hex(0x000000),
         error: Rgb::from_hex(0x8b0000),
-        warning: Rgb::from_hex(0x5a3a00),
+        warning: Rgb::from_hex(0x4e1c00),
         info: Rgb::from_hex(0x00337f),
         syntax: [
             Rgb::from_hex(0x4b0091),
@@ -294,6 +303,7 @@ pub const THEMES: [ThemeData; 8] = [
         id: "deep-contrast-dark",
         name: "Zacess Deep Contrast Dark",
         dark: true,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0x000000),
         foreground: Rgb::from_hex(0xffffff),
         muted: Rgb::from_hex(0xb3b3b3),
@@ -337,6 +347,7 @@ pub const THEMES: [ThemeData; 8] = [
         id: "deep-contrast-light",
         name: "Zacess Deep Contrast Light",
         dark: false,
+        text_contrast: 7.0,
         background: Rgb::from_hex(0xffffff),
         foreground: Rgb::from_hex(0x000000),
         muted: Rgb::from_hex(0x4d4d4d),
@@ -344,7 +355,7 @@ pub const THEMES: [ThemeData; 8] = [
         link: Rgb::from_hex(0x003df6),
         cursor: Rgb::from_hex(0x000000),
         error: Rgb::from_hex(0xaa0000),
-        warning: Rgb::from_hex(0x674100),
+        warning: Rgb::from_hex(0x642600),
         info: Rgb::from_hex(0x002ec2),
         syntax: [
             Rgb::from_hex(0x002ec2),
@@ -374,6 +385,94 @@ pub const THEMES: [ThemeData; 8] = [
             Rgb::from_hex(0xdb009a),
             Rgb::from_hex(0x0178c1),
             Rgb::from_hex(0x000000),
+        ],
+    },
+    ThemeData {
+        id: "warm-dark",
+        name: "Zacess Warm Dark",
+        dark: true,
+        text_contrast: 4.5,
+        background: Rgb::from_hex(0x211b17),
+        foreground: Rgb::from_hex(0xe5d5b6),
+        muted: Rgb::from_hex(0xcabca9),
+        accent: Rgb::from_hex(0xe9b56a),
+        link: Rgb::from_hex(0xe9b56a),
+        cursor: Rgb::from_hex(0xfec9a7),
+        error: Rgb::from_hex(0xfca8a1),
+        warning: Rgb::from_hex(0xfac97c),
+        info: Rgb::from_hex(0xaad3f1),
+        syntax: [
+            Rgb::from_hex(0xf69d74),
+            Rgb::from_hex(0xffafc0),
+            Rgb::from_hex(0xffe8a1),
+            Rgb::from_hex(0x71c0b6),
+            Rgb::from_hex(0xabba6f),
+            Rgb::from_hex(0xecb4d8),
+            Rgb::from_hex(0xbeb19e),
+            Rgb::from_hex(0xa4c9e9),
+            Rgb::from_hex(0xa6e3cd),
+        ],
+        ansi: [
+            Rgb::from_hex(0xada398),
+            Rgb::from_hex(0xfc9a8d),
+            Rgb::from_hex(0xa2be6f),
+            Rgb::from_hex(0xe4b35b),
+            Rgb::from_hex(0x88b9e3),
+            Rgb::from_hex(0xdfa1ca),
+            Rgb::from_hex(0x73c2b8),
+            Rgb::from_hex(0xcbc1b1),
+            Rgb::from_hex(0xb9b1a9),
+            Rgb::from_hex(0xfee4e0),
+            Rgb::from_hex(0xd9f2b0),
+            Rgb::from_hex(0xffe9b6),
+            Rgb::from_hex(0xd7ecff),
+            Rgb::from_hex(0xffe1f4),
+            Rgb::from_hex(0xb1f7ed),
+            Rgb::from_hex(0xfbf1dc),
+        ],
+    },
+    ThemeData {
+        id: "warm-light",
+        name: "Zacess Warm Light",
+        dark: false,
+        text_contrast: 4.5,
+        background: Rgb::from_hex(0xf4ead5),
+        foreground: Rgb::from_hex(0x342410),
+        muted: Rgb::from_hex(0x483b2c),
+        accent: Rgb::from_hex(0x6d3b02),
+        link: Rgb::from_hex(0x6d3b02),
+        cursor: Rgb::from_hex(0x5b1301),
+        error: Rgb::from_hex(0x710205),
+        warning: Rgb::from_hex(0x623d02),
+        info: Rgb::from_hex(0x01385c),
+        syntax: [
+            Rgb::from_hex(0x7b2701),
+            Rgb::from_hex(0x661237),
+            Rgb::from_hex(0x281601),
+            Rgb::from_hex(0x034c49),
+            Rgb::from_hex(0x3d4900),
+            Rgb::from_hex(0x5f174c),
+            Rgb::from_hex(0x504130),
+            Rgb::from_hex(0x033661),
+            Rgb::from_hex(0x002d24),
+        ],
+        ansi: [
+            Rgb::from_hex(0x342410),
+            Rgb::from_hex(0x8c1a16),
+            Rgb::from_hex(0x275200),
+            Rgb::from_hex(0x6a4603),
+            Rgb::from_hex(0x014b79),
+            Rgb::from_hex(0x742c60),
+            Rgb::from_hex(0x05514d),
+            Rgb::from_hex(0x574e44),
+            Rgb::from_hex(0x60574c),
+            Rgb::from_hex(0xa4332b),
+            Rgb::from_hex(0x386616),
+            Rgb::from_hex(0x845701),
+            Rgb::from_hex(0x115f93),
+            Rgb::from_hex(0x8a4074),
+            Rgb::from_hex(0x066662),
+            Rgb::from_hex(0x342410),
         ],
     },
 ];

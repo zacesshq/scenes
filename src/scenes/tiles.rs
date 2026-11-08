@@ -1,15 +1,23 @@
-//! Tiles: a calm grid of small pages, each with the folded corner of the Zacess mark. Some are
-//! filled in the theme's colours and the rest are left as a faint shade. One tile at a time,
-//! every few seconds, takes a new colour or settles back to its outline.
+//! Tiles, painted in solid pixels: a calm grid of small pages, each with the folded corner of
+//! the Zacess mark. Some are filled in the theme's colours, lit along their top and left edges
+//! and shaded along the others, with the fold turned back in a paler shade; the rest are left as
+//! a faint outline. One tile at a time, every few seconds, takes a new colour or settles back to
+//! its outline.
+//!
+//! Every colour comes from the active theme. The backdrop and the empty outlines are tints of
+//! the background held below the non-text floor, so they read as background; the filled tiles
+//! keep the theme's own drawing colours, so they stand out and keep their outline when colour is
+//! off.
 
+use crate::colour::Rgb;
 use crate::frame::Frame;
-use crate::glyphs;
+use crate::pixels::{Canvas, Ramp, Shades};
 use crate::rng::Rng;
 use crate::scene::{Motion, Scene};
 use crate::theme::ThemeData;
 
 pub const SUMMARY: &str =
-    "A grid of small folded pages in the theme's colours, one tile changing at a time";
+    "A grid of painted folded pages in the theme's colours, one tile changing at a time";
 
 pub const CAPTIONS: &[&str] = &[
     "Every tile in its place.",
@@ -24,27 +32,43 @@ pub const CHANGE_PERIOD: f32 = 3.0;
 /// The fewest seconds between two tile changes, on a large grid. A tile is a small part of a
 /// large screen, so even this keeps every large change well under three a second.
 pub const MIN_CHANGE_GAP: f32 = 0.7;
+/// Pixels between tiles across and down.
 const GAP_X: i32 = 2;
-const GAP_Y: i32 = 1;
+const GAP_Y: i32 = 2;
 
-pub struct Tiles {
-    width: usize,
-    height: usize,
-    motion: Motion,
-    tile_w: i32,
-    tile_h: i32,
-    columns: i32,
-    rows: i32,
-    left: i32,
-    top: i32,
-    /// The colour each tile is filled with, `None` for an outline.
-    colours: Vec<Option<usize>>,
-    since_change: f32,
-    changes: u32,
+/// The tiles' colours in one theme, every one derived from the theme's own.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Debug)]
+pub(crate) struct TileColours {
+    pub back_top: Rgb,
+    pub back_low: Rgb,
+    pub outline: Rgb,
+    pub inside: Rgb,
+    pub fills: [Rgb; 10],
+    back: Ramp,
+}
+
+impl TileColours {
+    pub(crate) fn new(theme: &ThemeData) -> Self {
+        let shades = Shades::new(theme);
+        let (back_top, back_low) = if theme.dark {
+            (shades.tint(theme.accent, 0.08, 1.12), theme.background)
+        } else {
+            (shades.tint(theme.accent, 0.12, 1.2), theme.background)
+        };
+        Self {
+            back_top,
+            back_low,
+            outline: shades.tint(theme.muted, 0.45, 2.2),
+            inside: shades.tint(theme.muted, 0.08, 1.1),
+            fills: palette(theme),
+            back: Ramp::new(back_top, back_low, 10),
+        }
+    }
 }
 
 /// The colour roles a tile can take, in a fixed order.
-fn palette(theme: &ThemeData) -> [crate::colour::Rgb; 10] {
+fn palette(theme: &ThemeData) -> [Rgb; 10] {
     [
         theme.accent,
         theme.cyan(),
@@ -59,6 +83,24 @@ fn palette(theme: &ThemeData) -> [crate::colour::Rgb; 10] {
     ]
 }
 
+pub struct Tiles {
+    width: usize,
+    height: usize,
+    motion: Motion,
+    /// A tile's width and height in pixels and the size of its fold.
+    tile_w: i32,
+    tile_h: i32,
+    fold: i32,
+    columns: i32,
+    rows: i32,
+    left: i32,
+    top: i32,
+    /// The colour each tile is filled with, `None` for an outline.
+    colours: Vec<Option<usize>>,
+    since_change: f32,
+    changes: u32,
+}
+
 impl Tiles {
     pub fn new(width: usize, height: usize, motion: Motion, rng: &mut Rng) -> Self {
         let mut tiles = Self {
@@ -66,7 +108,8 @@ impl Tiles {
             height: 1,
             motion,
             tile_w: 4,
-            tile_h: 3,
+            tile_h: 4,
+            fold: 1,
             columns: 0,
             rows: 0,
             left: 0,
@@ -101,6 +144,68 @@ impl Tiles {
         };
         self.changes += 1;
     }
+
+    /// Whether a pixel of a tile, from its top left, lies in the cut corner above the fold.
+    fn cut(&self, dx: i32, dy: i32) -> bool {
+        let from_right = self.tile_w - 1 - dx;
+        dy + from_right < self.fold
+    }
+
+    /// Whether a pixel of a tile lies on the fold flap: the corner turned back below the cut.
+    fn flap(&self, dx: i32, dy: i32) -> bool {
+        let from_right = self.tile_w - 1 - dx;
+        !self.cut(dx, dy) && from_right < self.fold && dy < self.fold
+    }
+
+    fn paint_filled(&self, canvas: &mut Canvas, theme: &ThemeData, x0: i32, y0: i32, base: Rgb) {
+        let shades = Shades::new(theme);
+        let lit = shades.lighter(base, 0.3);
+        let shade = shades.darker(base, 0.3);
+        let flap = shades.lighter(base, 0.55);
+        let (tw, th) = (self.tile_w, self.tile_h);
+        for dy in 0..th {
+            for dx in 0..tw {
+                if self.cut(dx, dy) {
+                    continue;
+                }
+                let colour = if self.flap(dx, dy) {
+                    flap
+                } else if dy == 0 || dx == 0 {
+                    lit
+                } else if dy == th - 1 || dx == tw - 1 {
+                    shade
+                } else {
+                    base
+                };
+                canvas.set(x0 + dx, y0 + dy, colour);
+            }
+        }
+        // the fold's own shadow, along its lower edge
+        if self.fold >= 2 {
+            canvas.set(x0 + tw - self.fold - 1, y0 + self.fold - 1, shade);
+        }
+    }
+
+    fn paint_empty(&self, canvas: &mut Canvas, c: &TileColours, x0: i32, y0: i32) {
+        let (tw, th) = (self.tile_w, self.tile_h);
+        for dy in 0..th {
+            for dx in 0..tw {
+                if self.cut(dx, dy) {
+                    continue;
+                }
+                let from_right = tw - 1 - dx;
+                let edge = dy == 0 || dx == 0 || dy == th - 1 || dx == tw - 1;
+                // the fold's diagonal closes the outline across the cut corner
+                let diagonal = dy + from_right == self.fold;
+                let colour = if edge || diagonal {
+                    c.outline
+                } else {
+                    c.inside
+                };
+                canvas.set(x0 + dx, y0 + dy, colour);
+            }
+        }
+    }
 }
 
 impl Scene for Tiles {
@@ -111,16 +216,28 @@ impl Scene for Tiles {
     fn resize(&mut self, width: usize, height: usize, rng: &mut Rng) {
         self.width = width.max(1);
         self.height = height.max(1);
-        let (w, h) = (self.width as i32, self.height as i32);
-        (self.tile_w, self.tile_h) = if w >= 120 && h >= 40 { (6, 4) } else { (4, 3) };
+        let (w, h) = (self.width as i32, self.height as i32 * 2);
+        (self.tile_w, self.tile_h, self.fold) = if self.width >= 120 && self.height >= 40 {
+            (10, 10, 3)
+        } else if self.width >= 40 && self.height >= 12 {
+            (6, 6, 2)
+        } else {
+            (4, 4, 1)
+        };
         // a margin all round keeps the grid off the edges of the screen
-        let (margin_x, margin_y) = if w >= 40 && h >= 12 { (2, 1) } else { (0, 0) };
+        let (margin_x, margin_y) = if self.width >= 40 && self.height >= 12 {
+            (2, 2)
+        } else {
+            (0, 0)
+        };
         self.columns = ((w - 2 * margin_x + GAP_X) / (self.tile_w + GAP_X)).max(1);
         self.rows = ((h - 2 * margin_y + GAP_Y) / (self.tile_h + GAP_Y)).max(1);
         let used_w = self.columns * (self.tile_w + GAP_X) - GAP_X;
         let used_h = self.rows * (self.tile_h + GAP_Y) - GAP_Y;
         self.left = ((w - used_w) / 2).max(0);
-        self.top = ((h - used_h) / 2).max(0);
+        // tiles start on an even pixel row, so a tile's top and bottom edges line up with
+        // whole cells and each change touches the fewest cells
+        self.top = ((h - used_h) / 2).max(0) & !1;
         let count = (self.columns * self.rows) as usize;
         self.colours = (0..count)
             .map(|_| rng.chance(0.3).then(|| rng.below(10)))
@@ -137,59 +254,43 @@ impl Scene for Tiles {
     }
 
     fn draw(&self, frame: &mut Frame, theme: &ThemeData) {
-        let colours = palette(theme);
-        let line = Some(theme.grey());
-        // the fold is the page's own colour on its lower left, leaving the corner cut; without
-        // the triangle the corner is simply left off
-        let fold = glyphs::fold_dark();
+        let c = TileColours::new(theme);
+        let mut canvas = Canvas::for_frame(frame, theme.background);
+        let tall = canvas.height() as i32;
+        for y in 0..tall {
+            canvas.fill_row(y, c.back.at(y as f32 / tall.max(1) as f32));
+        }
         let (tw, th) = (self.tile_w, self.tile_h);
         for row in 0..self.rows {
             for column in 0..self.columns {
                 let i = (row * self.columns + column) as usize;
                 let x0 = self.left + column * (tw + GAP_X);
                 let y0 = self.top + row * (th + GAP_Y);
-                if let Some(c) = self.colours.get(i).copied().flatten() {
-                    let colour = Some(colours[c]);
-                    for dy in 0..th {
-                        for dx in 0..tw {
-                            if dy == 0 && dx == tw - 1 {
-                                if let Some(f) = fold {
-                                    frame.put(x0 + dx, y0, f, colour);
-                                }
-                            } else {
-                                frame.put(x0 + dx, y0 + dy, '\u{2588}', colour);
-                            }
-                        }
-                    }
-                    continue;
+                match self.colours.get(i).copied().flatten() {
+                    Some(fill) => self.paint_filled(&mut canvas, theme, x0, y0, c.fills[fill]),
+                    None => self.paint_empty(&mut canvas, &c, x0, y0),
                 }
-                // an empty tile is the outline of a page, its folded corner a dot
-                for dx in 1..tw - 1 {
-                    frame.put(x0 + dx, y0, '\u{2500}', line);
-                    frame.put(x0 + dx, y0 + th - 1, '\u{2500}', line);
-                }
-                for dy in 1..th - 1 {
-                    frame.put(x0, y0 + dy, '\u{2502}', line);
-                    frame.put(x0 + tw - 1, y0 + dy, '\u{2502}', line);
-                }
-                frame.put(x0, y0, '\u{250c}', line);
-                frame.put(x0 + tw - 1, y0, '.', line);
-                frame.put(x0, y0 + th - 1, '\u{2514}', line);
-                frame.put(x0 + tw - 1, y0 + th - 1, '\u{2518}', line);
             }
         }
+        canvas.blit(frame);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scenes::testing::{check_determinism, check_scene, render};
+
+    use crate::pixels::{IMAGERY_CEILING, distance};
+    use crate::scenes::testing::{
+        check_determinism, check_pixel_scene, check_scene, pixels, render,
+    };
+    use crate::theme;
 
     #[test]
     fn passes_the_shared_checks() {
         check_scene("tiles");
         check_determinism("tiles");
+        check_pixel_scene("tiles", 6.0);
     }
 
     #[test]
@@ -227,7 +328,51 @@ mod tests {
         let share = filled as f32 / tiles.colours.len() as f32;
         assert!((0.15..0.6).contains(&share), "{share}");
         let frame = render(&mut tiles, 80, 24, 1);
-        assert!(frame.to_text().contains('\u{2588}'));
+        let c = TileColours::new(theme::default_theme());
+        let all = pixels(&frame);
+        assert!(c.fills.iter().any(|f| all.contains(f)));
+        assert!(all.contains(&c.outline));
         assert!(Tiles::new(20, 8, Motion::FULL, &mut rng).columns >= 3);
+        // the grid never runs off the screen
+        for (w, h) in [(20, 8), (80, 24), (200, 60)] {
+            let t = Tiles::new(w, h, Motion::FULL, &mut rng);
+            assert!(t.left + t.columns * (t.tile_w + GAP_X) - GAP_X <= w as i32);
+            assert!(t.top + t.rows * (t.tile_h + GAP_Y) - GAP_Y <= 2 * h as i32);
+        }
+    }
+
+    #[test]
+    fn every_tile_has_a_folded_corner() {
+        let mut rng = Rng::new(2);
+        let tiles = Tiles::new(80, 24, Motion::FULL, &mut rng);
+        let (tw, f) = (tiles.tile_w, tiles.fold);
+        assert!(tiles.cut(tw - 1, 0));
+        assert!(!tiles.cut(0, 0) && !tiles.cut(tw - 1, f));
+        assert!(f == 1 || tiles.flap(tw - 2, f - 1));
+    }
+
+    #[test]
+    fn the_colours_stay_distinct_and_in_bounds_in_every_theme() {
+        for theme in theme::all() {
+            let c = TileColours::new(theme);
+            let name = theme.name;
+            for (what, colour) in [
+                ("backdrop", c.back_top),
+                ("outline", c.outline),
+                ("inside", c.inside),
+            ] {
+                assert!(
+                    theme.contrast_of(colour) < IMAGERY_CEILING,
+                    "the {what} in {name} is {:.2}:1",
+                    theme.contrast_of(colour)
+                );
+            }
+            assert!(distance(c.outline, c.inside) >= 0.05, "{name}");
+            assert!(distance(c.inside, c.back_low) >= 0.01, "{name}");
+            for fill in c.fills {
+                assert!(theme.contrast_of(fill) >= theme.floor(), "{name}");
+                assert!(distance(fill, c.outline) >= 0.08, "{name}");
+            }
+        }
     }
 }

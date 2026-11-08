@@ -35,15 +35,21 @@ pub fn coverage(ch: char) -> f32 {
     }
 }
 
-/// How bright a cell looks against the background, from 0 to 1.
+/// How bright a cell looks against the background, from 0 to 1. The part of the cell its
+/// character covers takes the foreground; the rest takes the cell's own background when it has
+/// one, so a pixel cell counts in full.
 fn ink(cell: Cell, theme: &ThemeData) -> f32 {
+    let base = theme.background.luminance();
     let cover = coverage(cell.ch);
+    let back = cell
+        .bg
+        .map_or(0.0, |bg| (bg.luminance() - base).abs() as f32);
     if cover == 0.0 {
-        return 0.0;
+        return back;
     }
     let colour = cell.colour.unwrap_or(theme.foreground);
-    let difference = (colour.luminance() - theme.background.luminance()).abs() as f32;
-    cover * difference
+    let difference = (colour.luminance() - base).abs() as f32;
+    cover * difference + (1.0 - cover) * back
 }
 
 /// The mean brightness of each region and then of the whole frame.
@@ -217,6 +223,19 @@ mod tests {
         a.put_str(10, 5, "><(((o>", Some(theme.foreground));
         b.put_str(11, 5, "><(((o>", Some(theme.foreground));
         assert!(!large_change(&regions(&a, theme), &regions(&b, theme)));
+    }
+
+    #[test]
+    fn a_background_counts_towards_brightness() {
+        let theme = theme::default_theme();
+        let mut lit = Frame::new(40, 12);
+        for y in 0..12 {
+            for x in 0..40 {
+                lit.put_cell(x, y, Cell::pixels(theme.foreground, theme.foreground));
+            }
+        }
+        let dark = Frame::new(40, 12);
+        assert!(large_change(&regions(&lit, theme), &regions(&dark, theme)));
     }
 
     #[test]

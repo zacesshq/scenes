@@ -8,6 +8,9 @@
 //! are tested against; a frame that would break the limit is held back and a script that keeps
 //! trying is stopped. Any error stops the script and is reported through `Scene::problem`, so the
 //! caller can swap in a built-in scene.
+//!
+//! Besides text, a script can paint solid imagery on the same two-pixels-to-a-cell canvas the
+//! built-in scenes use, again by role. It can also read the local date and time from `ctx.clock`.
 
 use std::cell::{Cell, RefCell};
 use std::path::{Path, PathBuf};
@@ -19,9 +22,11 @@ use mlua::{
     ChunkMode, Function, HookTriggers, Lua, LuaOptions, StdLib, Table, Value, Variadic, VmState,
 };
 
+use crate::clock::{self, Civil};
 use crate::colour::Rgb;
 use crate::flash::{Meter, Verdict};
-use crate::frame::Frame;
+use crate::frame::{Cell as FrameCell, Frame};
+use crate::pixels::{Canvas, mix};
 use crate::rng::Rng;
 use crate::scene::{Level, Moment, Motion, Scene};
 use crate::scenes::{self, Kind};
@@ -39,6 +44,17 @@ pub const MEMORY_LIMIT: usize = 32 * 1024 * 1024;
 pub const MAX_HELD: usize = 10;
 /// The most `put` calls one frame may make, so a script cannot grow the draw list without end.
 const MAX_PUTS: usize = 20_000;
+/// The most pixel calls (`pixel`, `rect`, `disc`, `line` and `blend`) one frame may make.
+const MAX_PIXEL_CALLS: usize = 50_000;
+/// How far from the origin a pixel position may lie before it is held there, which keeps every
+/// coordinate well inside `i32` once it is turned into pixels. Shapes are cut to the canvas when
+/// they are painted and `PIXEL_AREA_BUDGET` bounds what one frame paints, so this limit is about
+/// safe arithmetic rather than cost.
+const PIXEL_REACH: f64 = 10_000.0;
+/// How many canvas areas of pixels one frame's pixel calls may touch, counted after each shape is
+/// cut to the canvas. Past it the rest of that frame's imagery is left out, so even a frame of
+/// `MAX_PIXEL_CALLS` screen-sized discs paints in a few milliseconds.
+const PIXEL_AREA_BUDGET: u64 = 64;
 /// The longest text one `put` call draws.
 const MAX_PUT_CHARS: usize = 1_000;
 /// How often the budget hook runs, in instructions. A larger step costs less and still stops a
@@ -201,6 +217,83 @@ struct Put {
     y: i32,
     text: String,
     role: Role,
+}
+
+/// The shape of one pixel call, in pixels: one pixel across each character cell and two down.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Shape {
+    Pixel(i32, i32),
+    Rect(i32, i32, i32, i32),
+    Disc(f32, f32, f32),
+    Line(i32, i32, i32, i32),
+    Blend(i32, i32),
+}
+
+/// One pixel call, kept as a role and a strength so the same frame can be painted in any theme.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct PixelCall {
+    shape: Shape,
+    role: Role,
+    /// How far from the background towards the role's colour, from 0 to 1. For `blend` it is
+    /// how far the pixel already there moves towards the role's colour.
+    strength: f32,
+}
+
+/// Everything one frame of a script draws: the pixel imagery first, then the text over it.
+#[derive(Clone, Debug, Default, PartialEq)]
+struct Drawing {
+    puts: Vec<Put>,
+    pixels: Vec<PixelCall>,
+}
+
+/// A role name from a script, with the error every drawing function gives for a bad one.
+fn parse_role(role: Option<String>) -> mlua::Result<Role> {
+    match role {
+        None => Ok(Role::Text),
+        Some(name) => Role::parse(&name).ok_or_else(|| {
+            mlua::Error::runtime(format!(
+                "\"{name}\" is not a palette role; use one such as \"text\", \
+                 \"accent\" or \"syntax.keyword\""
+            ))
+        }),
+    }
+}
+
+/// A coordinate from a script, rounded down and held within reach of the canvas.
+fn coordinate(value: f64) -> mlua::Result<f64> {
+    if value.is_finite() {
+        Ok(value.floor().clamp(-PIXEL_REACH, PIXEL_REACH))
+    } else {
+        Err(mlua::Error::runtime("a pixel position must be a number"))
+    }
+}
+
+/// A strength from a script: 1 when left out, held between 0 and 1.
+fn strength(value: Option<f64>) -> mlua::Result<f32> {
+    match value {
+        None => Ok(1.0),
+        Some(v) if v.is_finite() => Ok(v.clamp(0.0, 1.0) as f32),
+        Some(_) => Err(mlua::Error::runtime(
+            "a strength must be a number from 0 to 1",
+        )),
+    }
+}
+
+/// The local date and time as the table a script reads from `ctx.clock`.
+fn clock_table(lua: &Lua, now: &Civil) -> mlua::Result<Table> {
+    let table = lua.create_table()?;
+    table.set("year", now.year)?;
+    table.set("month", now.month)?;
+    table.set("day", now.day)?;
+    table.set("hour", now.hour)?;
+    table.set("minute", now.minute)?;
+    table.set("second", now.second)?;
+    table.set("weekday", now.weekday)?;
+    table.set("weekday_name", now.weekday_name())?;
+    table.set("month_name", now.month_name())?;
+    table.set("time", now.time_text())?;
+    table.set("date", now.date_text())?;
+    Ok(table)
 }
 
 /// A user scene found on disk: what the listing and the config need, plus its source.
@@ -492,7 +585,7 @@ pub struct LuaScene {
     sandbox: Sandbox,
     module: Table,
     ctx: Table,
-    puts: Rc<RefCell<Vec<Put>>>,
+    drawing: Rc<RefCell<Drawing>>,
     width: usize,
     height: usize,
     t: f64,
@@ -502,10 +595,14 @@ pub struct LuaScene {
     problem: RefCell<Option<String>>,
     meter: RefCell<Meter>,
     /// The last frame the meter let through, drawn again while a frame is held back.
-    shown: RefCell<Vec<Put>>,
+    shown: RefCell<Drawing>,
     /// The generation of the frame the meter last judged.
     judged: Cell<Option<u64>>,
     scratch: RefCell<Frame>,
+    /// Where `ctx.clock` reads the time from: the system or a fixed start for snapshots.
+    clock: clock::Source,
+    /// The time `ctx.clock` last showed, so the table is only rebuilt when a second passes.
+    clock_shown: Cell<Option<Option<Civil>>>,
 }
 
 impl LuaScene {
@@ -519,21 +616,13 @@ impl LuaScene {
         let sandbox = Sandbox::new()?;
         let module = sandbox.run(&user.path, &user.source)?;
         let lua = &sandbox.lua;
-        let puts: Rc<RefCell<Vec<Put>>> = Rc::new(RefCell::new(Vec::new()));
+        let drawing: Rc<RefCell<Drawing>> = Rc::new(RefCell::new(Drawing::default()));
         let scene_rng = Rc::new(RefCell::new(Rng::new(rng.next_u64())));
 
-        let sink = Rc::clone(&puts);
+        let sink = Rc::clone(&drawing);
         let put = lua.create_function(
             move |_, (x, y, text, role): (f64, f64, Value, Option<String>)| {
-                let role = match role {
-                    None => Role::Text,
-                    Some(name) => Role::parse(&name).ok_or_else(|| {
-                        mlua::Error::runtime(format!(
-                            "\"{name}\" is not a palette role; use one such as \"text\", \
-                             \"accent\" or \"syntax.keyword\""
-                        ))
-                    })?,
-                };
+                let role = parse_role(role)?;
                 let text = match text {
                     Value::String(s) => s.to_string_lossy(),
                     Value::Integer(i) => i.to_string(),
@@ -545,7 +634,8 @@ impl LuaScene {
                     .take(MAX_PUT_CHARS)
                     .map(|c| if safe_glyph(c) { c } else { '?' })
                     .collect();
-                let mut list = sink.borrow_mut();
+                let mut drawing = sink.borrow_mut();
+                let list = &mut drawing.puts;
                 if list.len() >= MAX_PUTS {
                     return Err(mlua::Error::runtime(format!(
                         "more than {MAX_PUTS} put calls in one frame"
@@ -580,6 +670,75 @@ impl LuaScene {
         let ctx = lua.create_table()?;
         ctx.set("put", put)?;
         ctx.set("random", random)?;
+
+        // the pixel functions all record one call each, checked the same way
+        let record = |shape_of: fn(&[f64]) -> Shape, coords: usize| {
+            let sink = Rc::clone(&drawing);
+            lua.create_function(move |_, args: Variadic<Value>| {
+                let mut numbers = Vec::with_capacity(coords);
+                for i in 0..coords {
+                    match args.get(i) {
+                        Some(Value::Integer(n)) => numbers.push(coordinate(*n as f64)?),
+                        Some(Value::Number(n)) => numbers.push(coordinate(*n)?),
+                        _ => {
+                            return Err(mlua::Error::runtime(format!(
+                                "this pixel function needs {coords} numbers before the role"
+                            )));
+                        }
+                    }
+                }
+                let role = match args.get(coords) {
+                    None | Some(Value::Nil) => None,
+                    Some(Value::String(s)) => Some(s.to_string_lossy()),
+                    Some(_) => return Err(mlua::Error::runtime("a role must be a string")),
+                };
+                let amount = match args.get(coords + 1) {
+                    None | Some(Value::Nil) => None,
+                    Some(Value::Integer(n)) => Some(*n as f64),
+                    Some(Value::Number(n)) => Some(*n),
+                    Some(_) => return Err(mlua::Error::runtime("a strength must be a number")),
+                };
+                let call = PixelCall {
+                    shape: shape_of(&numbers),
+                    role: parse_role(role)?,
+                    strength: strength(amount)?,
+                };
+                let mut drawing = sink.borrow_mut();
+                if drawing.pixels.len() >= MAX_PIXEL_CALLS {
+                    return Err(mlua::Error::runtime(format!(
+                        "more than {MAX_PIXEL_CALLS} pixel calls in one frame"
+                    )));
+                }
+                drawing.pixels.push(call);
+                Ok(())
+            })
+        };
+        ctx.set(
+            "pixel",
+            record(|n| Shape::Pixel(n[0] as i32, n[1] as i32), 2)?,
+        )?;
+        ctx.set(
+            "rect",
+            record(
+                |n| Shape::Rect(n[0] as i32, n[1] as i32, n[2] as i32, n[3] as i32),
+                4,
+            )?,
+        )?;
+        ctx.set(
+            "disc",
+            record(|n| Shape::Disc(n[0] as f32, n[1] as f32, n[2] as f32), 3)?,
+        )?;
+        ctx.set(
+            "line",
+            record(
+                |n| Shape::Line(n[0] as i32, n[1] as i32, n[2] as i32, n[3] as i32),
+                4,
+            )?,
+        )?;
+        ctx.set(
+            "blend",
+            record(|n| Shape::Blend(n[0] as i32, n[1] as i32), 2)?,
+        )?;
         ctx.set(
             "motion",
             match motion.level {
@@ -598,16 +757,18 @@ impl LuaScene {
             sandbox,
             module,
             ctx,
-            puts,
+            drawing,
             width: width.max(1),
             height: height.max(1),
             t: 0.0,
             generation: 0,
             problem: RefCell::new(None),
             meter: RefCell::new(Meter::new()),
-            shown: RefCell::new(Vec::new()),
+            shown: RefCell::new(Drawing::default()),
             judged: Cell::new(None),
             scratch: RefCell::new(Frame::new(width, height)),
+            clock: clock::Source::current(),
+            clock_shown: Cell::new(None),
         };
         scene.update_ctx(0.0)?;
         scene.call_hook("init", INIT_BUDGET)?;
@@ -620,6 +781,19 @@ impl LuaScene {
         self.ctx.set("height", self.height)?;
         self.ctx.set("time", self.t)?;
         self.ctx.set("dt", dt)?;
+        self.ctx.set("pixel_width", self.width)?;
+        self.ctx.set("pixel_height", self.height * 2)?;
+        // ctx.clock is rebuilt only when the time it shows changes, which is once a second
+        let now = self.clock.now(self.t);
+        if self.clock_shown.get() != Some(now) {
+            self.clock_shown.set(Some(now));
+            match now {
+                Some(now) => self
+                    .ctx
+                    .set("clock", clock_table(&self.sandbox.lua, &now)?)?,
+                None => self.ctx.set("clock", Value::Nil)?,
+            }
+        }
         Ok(())
     }
 
@@ -641,7 +815,11 @@ impl LuaScene {
     /// Runs `frame` and keeps what it drew.
     fn render_frame(&mut self, dt: f32) -> mlua::Result<()> {
         self.update_ctx(dt)?;
-        self.puts.borrow_mut().clear();
+        {
+            let mut drawing = self.drawing.borrow_mut();
+            drawing.puts.clear();
+            drawing.pixels.clear();
+        }
         self.generation += 1;
         let frame: Function = self.module.get("frame")?;
         self.call(&frame, FRAME_BUDGET)?;
@@ -659,11 +837,84 @@ impl LuaScene {
         self.problem.borrow().is_some()
     }
 
-    fn paint(puts: &[Put], frame: &mut Frame, theme: &ThemeData) {
-        for put in puts {
-            let colour = Some(put.role.colour(theme));
+    /// Paints a frame's pixel calls onto a canvas, then its text over them. Only pixels that
+    /// differ from the background are written, so a scene with no imagery keeps the terminal's
+    /// own background just as before.
+    fn paint(drawing: &Drawing, frame: &mut Frame, theme: &ThemeData) {
+        if !drawing.pixels.is_empty() {
+            let background = theme.background;
+            let mut canvas = Canvas::for_frame(frame, background);
+            let (cw, ch) = (canvas.width() as i32, canvas.height() as i32);
+            let most = (canvas.width() + canvas.height()) as f32;
+            let budget = PIXEL_AREA_BUDGET * (canvas.width() * canvas.height()) as u64;
+            let mut spent = 0u64;
+            for call in &drawing.pixels {
+                let cost = match call.shape {
+                    Shape::Pixel(..) | Shape::Blend(..) => 1,
+                    Shape::Rect(x, y, w, h) => {
+                        let width = (x + w).min(cw) - x.max(0);
+                        let height = (y + h).min(ch) - y.max(0);
+                        width.max(0) as u64 * height.max(0) as u64
+                    }
+                    Shape::Disc(cx, cy, r) => canvas.disc_cost(cx, cy, r.clamp(0.0, most)),
+                    Shape::Line(x0, y0, x1, y1) => canvas.line_cost((x0, y0), (x1, y1)),
+                };
+                spent += cost;
+                if spent > budget {
+                    break;
+                }
+                let full = call.role.colour(theme);
+                let colour = mix(background, full, call.strength);
+                match call.shape {
+                    Shape::Pixel(x, y) => canvas.set(x, y, colour),
+                    Shape::Rect(x, y, w, h) => {
+                        // a rectangle is cut to the canvas before it is filled
+                        let (x0, y0) = (x.max(0), y.max(0));
+                        let (x1, y1) = ((x + w).min(cw), (y + h).min(ch));
+                        if x1 > x0 && y1 > y0 {
+                            canvas.fill_rect(x0, y0, x1 - x0, y1 - y0, colour);
+                        }
+                    }
+                    Shape::Disc(cx, cy, r) => canvas.disc(cx, cy, r.clamp(0.0, most), colour),
+                    Shape::Line(x0, y0, x1, y1) => canvas.line((x0, y0), (x1, y1), colour),
+                    Shape::Blend(x, y) => canvas.blend(x, y, full, call.strength),
+                }
+            }
+            for y in 0..frame.height() {
+                for x in 0..frame.width() {
+                    let top = canvas.get(x as i32, 2 * y as i32).unwrap_or(background);
+                    let bottom = canvas.get(x as i32, 2 * y as i32 + 1).unwrap_or(background);
+                    if top != background || bottom != background {
+                        frame.put_cell(x as i32, y as i32, FrameCell::pixels(top, bottom));
+                    }
+                }
+            }
+        }
+        let floor = theme.floor();
+        for put in &drawing.puts {
+            let colour = put.role.colour(theme);
             for (i, ch) in put.text.chars().enumerate() {
-                frame.put(put.x.saturating_add(i as i32), put.y, ch, colour);
+                let x = put.x.saturating_add(i as i32);
+                let under = frame
+                    .get(x, put.y)
+                    .filter(FrameCell::is_pixel)
+                    .and_then(|cell| cell.bg);
+                match under {
+                    // a space leaves imagery as it is, so text can be laid out over a picture
+                    Some(_) if ch == ' ' => {}
+                    // text keeps the imagery behind it only while it keeps its full contrast
+                    // against it; otherwise the cell falls back to the plain background
+                    Some(bg) if colour.contrast(bg) >= floor => frame.put_cell(
+                        x,
+                        put.y,
+                        FrameCell {
+                            ch,
+                            colour: Some(colour),
+                            bg: Some(bg),
+                        },
+                    ),
+                    _ => frame.put(x, put.y, ch, Some(colour)),
+                }
             }
         }
     }
@@ -709,10 +960,10 @@ impl Scene for LuaScene {
             self.judged.set(Some(self.generation));
             let mut scratch = self.scratch.borrow_mut();
             scratch.clear();
-            Self::paint(&self.puts.borrow(), &mut scratch, theme);
+            Self::paint(&self.drawing.borrow(), &mut scratch, theme);
             let mut meter = self.meter.borrow_mut();
             if meter.judge(&scratch, theme) == Verdict::Show {
-                *self.shown.borrow_mut() = self.puts.borrow().clone();
+                *self.shown.borrow_mut() = self.drawing.borrow().clone();
             }
             if meter.held_recently() > MAX_HELD {
                 *self.problem.borrow_mut() = Some(format!(
@@ -833,8 +1084,17 @@ return {
       -- put(x, y, text, role): the role is a palette name, never a colour
       put(drop.x, math.floor(drop.y), ":", "bright_blue")
     end
+    -- solid pixels, two to a cell: a faint band of water behind the horizon. A strength
+    -- from 0 to 1 fades a role towards the background; check first on older versions
+    if ctx.rect then
+      ctx.rect(0, ctx.pixel_height - 4, ctx.pixel_width, 4, "blue", 0.35)
+    end
     -- a horizon along the bottom row
     put(0, ctx.height - 1, string.rep("~", ctx.width), "cyan")
+    -- ctx.clock is the local date and time (nil where it is not known)
+    if ctx.clock then
+      put(1, 0, ctx.clock.time, "muted")
+    end
   end,
 
   -- optional: return a caption for the moment; return nothing to use the list above
@@ -849,7 +1109,6 @@ mod tests {
     use super::*;
     use crate::flash::{MAX_CHANGES_PER_SECOND, most_changes_per_second, regions};
     use crate::theme;
-    use std::time::{Duration, Instant};
 
     const EXAMPLE: &str = include_str!("../examples/scenes/lantern.lua");
 
@@ -978,25 +1237,28 @@ mod tests {
 
     #[test]
     fn the_instruction_budget_stops_an_endless_loop() {
-        let start = Instant::now();
+        // a loop in the script's own body runs past the start-up budget
         let error = scene_from("while true do end").unwrap_err();
         assert!(error.contains("budget"), "{error}");
-        let mut scene = build(
-            "return { frame = function(ctx) if ctx.time > 0 then while true do end end end }",
+        // a loop inside a frame runs past the frame budget. The budget counts instructions, not
+        // time, so this holds however busy the machine is
+        let user = scene_from(
+            "calls = 0\nreturn { frame = function(ctx) calls = calls + 1 \
+             if ctx.time > 0 then while true do end end end }",
         )
         .unwrap();
-        run(scene.as_mut(), 3, 40, 12);
+        let mut scene = LuaScene::build(&user, 40, 12, Motion::FULL, &mut Rng::new(1)).unwrap();
+        run(&mut scene, 3, 40, 12);
         let problem = scene.problem().unwrap();
         assert!(problem.contains("budget"), "{problem}");
-        assert!(
-            start.elapsed() < Duration::from_secs(1),
-            "{:?}",
-            start.elapsed()
-        );
+        // the hook stopped the loop once the frame's whole budget was spent
+        assert!(scene.sandbox.remaining.load(Ordering::Relaxed) <= 0);
+        let calls = |scene: &LuaScene| scene.sandbox.lua.globals().get::<i64>("calls").unwrap();
+        let before = calls(&scene);
+        assert!(before >= 1, "{before}");
         // a stopped scene is not called again, so later frames cost nothing
-        let later = Instant::now();
-        run(scene.as_mut(), 100, 40, 12);
-        assert!(later.elapsed() < Duration::from_millis(200));
+        run(&mut scene, 100, 40, 12);
+        assert_eq!(calls(&scene), before);
     }
 
     #[test]
@@ -1229,5 +1491,230 @@ mod tests {
             let mut scene = create(&user, width, height, Motion::FULL, &mut Rng::new(1)).unwrap();
             println!("{}\n", run(scene.as_mut(), 120, width, height).to_text());
         }
+    }
+
+    #[test]
+    fn the_clock_reads_a_fixed_start_and_moves_on_with_the_scene() {
+        let source = r#"return { frame = function(ctx)
+            local c = ctx.clock
+            put(0, 0, c.time .. " " .. c.second)
+            put(0, 1, c.date)
+            put(0, 2, c.weekday .. " " .. c.weekday_name .. " " .. c.month .. " " .. c.month_name)
+            put(0, 3, c.year .. "-" .. c.day .. " " .. c.hour .. ":" .. c.minute)
+          end }"#;
+        let user = scene_from(source).unwrap();
+        let start = crate::clock::parse_snapshot_clock("2026-11-07T23:59").unwrap();
+        let mut scene = crate::clock::with_fixed(start, || {
+            create(&user, 40, 6, Motion::FULL, &mut Rng::new(1)).unwrap()
+        });
+        // 61 seconds in at 20 frames a second the clock has passed midnight into Sunday
+        let frame = run(scene.as_mut(), 61 * 20, 40, 6);
+        assert_eq!(frame.row_text(0).trim(), "00:00 1");
+        assert_eq!(frame.row_text(1).trim(), "Sunday 8 November 2026");
+        assert_eq!(frame.row_text(2).trim(), "7 Sunday 11 November");
+        assert_eq!(frame.row_text(3).trim(), "2026-8 0:0");
+        assert!(scene.problem().is_none());
+    }
+
+    #[test]
+    fn the_clock_is_there_in_hooks_and_the_same_start_draws_the_same_frame() {
+        let source = r#"local at = "none"
+          return { frame = function(ctx) put(0, 0, at) end,
+            on_pass = function(ctx) at = ctx.clock.time; return "Passed at " .. at end }"#;
+        let user = scene_from(source).unwrap();
+        let start = crate::clock::parse_snapshot_clock("18:45").unwrap();
+        let make = || {
+            crate::clock::with_fixed(start, || {
+                create(&user, 20, 2, Motion::FULL, &mut Rng::new(1)).unwrap()
+            })
+        };
+        let mut a = make();
+        let mut b = make();
+        assert_eq!(
+            a.caption_for(Moment::Pass).as_deref(),
+            Some("Passed at 18:45")
+        );
+        b.caption_for(Moment::Pass);
+        assert_eq!(run(a.as_mut(), 5, 20, 2), run(b.as_mut(), 5, 20, 2));
+        assert_eq!(run(a.as_mut(), 1, 20, 2).row_text(0).trim(), "18:45");
+    }
+
+    #[test]
+    fn pixels_paint_in_the_role_colour_and_leave_the_rest_alone() {
+        let source = r#"return { frame = function(ctx)
+            ctx.rect(0, 0, 4, 2, "accent")
+            ctx.pixel(5, 1, "green")
+            ctx.rect(10, 0, 2, 2, "cyan", 0.5)
+            ctx.disc(30, 14, 3, "yellow")
+            ctx.line(0, 20, 39, 20, "blue")
+            ctx.blend(5, 1, "red", 0)
+            put(0, 3, ctx.pixel_width .. "x" .. ctx.pixel_height)
+          end }"#;
+        let theme = theme::default_theme();
+        let mut scene = build(source).unwrap();
+        let frame = run(scene.as_mut(), 2, 40, 12);
+        let accent = Role::Accent.colour(theme);
+        // two pixel rows make one cell: the first rectangle fills cells 0 to 3 of row 0
+        for x in 0..4 {
+            let cell = frame.get(x, 0).unwrap();
+            assert_eq!(cell.pixel_pair(), Some((accent, accent)));
+        }
+        let green = Role::Green.colour(theme);
+        assert_eq!(
+            frame.get(5, 0).unwrap().pixel_pair(),
+            Some((theme.background, green))
+        );
+        let half = mix(theme.background, Role::Cyan.colour(theme), 0.5);
+        assert_eq!(frame.get(10, 0).unwrap().pixel_pair(), Some((half, half)));
+        assert_eq!(frame.get(20, 0).unwrap(), FrameCell::BLANK);
+        assert!(frame.get(30, 7).unwrap().is_pixel());
+        assert!(frame.get(39, 10).unwrap().is_pixel());
+        assert_eq!(frame.row_text(3).trim(), "40x24");
+    }
+
+    #[test]
+    fn text_over_pixels_keeps_its_floor_and_spaces_leave_the_picture() {
+        let source = r#"return { frame = function(ctx)
+            ctx.rect(0, 0, ctx.pixel_width, ctx.pixel_height, "accent")
+            ctx.rect(0, 0, ctx.pixel_width, 4, "muted", 0.15)
+            put(0, 0, "text on a faint wash", "bright")
+            put(0, 3, "  words  ", "text")
+            put(0, 5, "error", "error")
+          end }"#;
+        for theme in theme::all() {
+            let user = scene_from(source).unwrap();
+            let mut scene = create(&user, 30, 8, Motion::FULL, &mut Rng::new(1)).unwrap();
+            let mut rng = Rng::new(2);
+            scene.step(0.05, &mut rng);
+            let mut frame = Frame::new(30, 8);
+            scene.draw(&mut frame, theme);
+            for cell in frame
+                .cells()
+                .iter()
+                .filter(|c| c.ch != ' ' && !c.is_pixel())
+            {
+                let colour = cell.colour.unwrap();
+                let behind = cell.bg.unwrap_or(theme.background);
+                assert!(
+                    colour.contrast(behind) >= theme.floor() - 1e-9,
+                    "{}: {:?} on {:?}",
+                    theme.name,
+                    colour,
+                    behind
+                );
+            }
+            // the spaces around the words leave the accent showing
+            let accent = Role::Accent.colour(theme);
+            assert_eq!(
+                frame.get(0, 3).unwrap().pixel_pair(),
+                Some((accent, accent))
+            );
+        }
+    }
+
+    #[test]
+    fn bad_pixel_calls_stop_the_script_with_a_clear_reason() {
+        for (body, needle) in [
+            (r##"ctx.pixel(1, 1, "#ff0000")"##, "not a palette role"),
+            (r#"ctx.rect(1, 2, "accent")"#, "needs 4 numbers"),
+            (r#"ctx.disc(1, 2, 0/0, "accent")"#, "must be a number"),
+            (r#"ctx.pixel(1, 1, "accent", "lots")"#, "strength"),
+            (
+                r#"for i = 1, 60000 do ctx.pixel(i % 40, 0, "accent") end"#,
+                "pixel calls",
+            ),
+        ] {
+            let source = format!("return {{ frame = function(ctx) {body} end }}");
+            let user = scene_from(&source).unwrap();
+            let error = match create(&user, 40, 12, Motion::FULL, &mut Rng::new(1)) {
+                Err(error) => error,
+                Ok(_) => panic!("{body} should have failed"),
+            };
+            assert!(error.contains(needle), "{body}: {error}");
+        }
+        // a rectangle or disc far bigger than the screen is cut, not refused
+        let mut scene = build(
+            r#"return { frame = function(ctx)
+                ctx.rect(-1e9, -1e9, 2e9, 2e9, "blue", 0.3)
+                ctx.disc(20, 12, 1e9, "blue", 0.2)
+              end }"#,
+        )
+        .unwrap();
+        run(scene.as_mut(), 3, 40, 12);
+        assert!(scene.problem().is_none());
+    }
+
+    #[test]
+    fn a_frame_of_the_most_huge_discs_still_paints_quickly() {
+        let source = format!(
+            r#"return {{ frame = function(ctx)
+                for i = 1, {MAX_PIXEL_CALLS} do
+                  ctx.disc(i % 3 * 5000 - 5000, ctx.pixel_height / 2, 1e9, "blue", 0.3)
+                end
+              end }}"#
+        );
+        let user = scene_from(&source).unwrap();
+        let start = std::time::Instant::now();
+        let mut scene = create(&user, 200, 60, Motion::FULL, &mut Rng::new(1)).unwrap();
+        let frame = run(scene.as_mut(), 1, 200, 60);
+        let took = start.elapsed();
+        assert!(scene.problem().is_none());
+        // the discs that reached the canvas still painted it before the budget ran out
+        assert!(frame.get(100, 30).unwrap().is_pixel());
+        let limit = if cfg!(debug_assertions) { 20_000 } else { 250 };
+        assert!(
+            took < std::time::Duration::from_millis(limit),
+            "a frame took {took:?}"
+        );
+    }
+
+    #[test]
+    fn pixel_calls_past_the_area_budget_are_left_out_of_that_frame() {
+        let call = |shape, role| PixelCall {
+            shape,
+            role,
+            strength: 1.0,
+        };
+        let theme = theme::default_theme();
+        let top_left = |screens: u64| {
+            let mut drawing = Drawing::default();
+            for _ in 0..screens {
+                drawing
+                    .pixels
+                    .push(call(Shape::Rect(-9, -9, 99, 99), Role::Blue));
+            }
+            // a shape off the canvas costs nothing
+            drawing
+                .pixels
+                .push(call(Shape::Disc(-500.0, -500.0, 9.0), Role::Green));
+            drawing.pixels.push(call(Shape::Pixel(0, 0), Role::Red));
+            let mut frame = Frame::new(40, 12);
+            LuaScene::paint(&drawing, &mut frame, theme);
+            frame.get(0, 0).unwrap().pixel_pair().unwrap().0
+        };
+        assert_eq!(top_left(PIXEL_AREA_BUDGET - 1), Role::Red.colour(theme));
+        assert_eq!(top_left(PIXEL_AREA_BUDGET), Role::Blue.colour(theme));
+    }
+
+    #[test]
+    fn flashing_pixels_are_damped_then_stopped() {
+        let source = r#"return { frame = function(ctx)
+            if math.floor(ctx.time * 20 + 0.5) % 2 == 0 then
+              ctx.rect(0, 0, ctx.pixel_width, ctx.pixel_height, "bright")
+            end
+          end }"#;
+        let mut scene = build(source).unwrap();
+        let theme = theme::default_theme();
+        let mut rng = Rng::new(3);
+        let mut frame = Frame::new(40, 12);
+        let mut shown = Vec::new();
+        for _ in 0..(10 * 20) {
+            scene.step(0.05, &mut rng);
+            frame.clear();
+            scene.draw(&mut frame, theme);
+            shown.push(regions(&frame, theme));
+        }
+        assert!(most_changes_per_second(&shown, 20) <= MAX_CHANGES_PER_SECOND);
+        assert!(scene.problem().unwrap().contains("flashed"));
     }
 }

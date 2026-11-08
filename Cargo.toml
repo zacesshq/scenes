@@ -1,9 +1,9 @@
 [package]
 name = "zacess-scenes"
-version = "0.6.0"
+version = "1.0.0"
 edition = "2024"
 rust-version = "1.85"
-description = "Calm animated scenes for the terminal in the Zacess high contrast themes"
+description = "Calm animated scenes for the terminal in the ten Zacess accessible themes"
 license = "MIT"
 repository = "https://github.com/zacesshq/scenes"
 homepage = "https://zacess.com"

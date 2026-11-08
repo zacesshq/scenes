@@ -1,4 +1,4 @@
-//! The eight Zacess themes, the colour roles a scene draws with and how the active theme is found.
+//! The ten Zacess themes, the colour roles a scene draws with and how the active theme is found.
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -14,7 +14,7 @@ pub const DEFAULT_LIGHT_ID: &str = "deep-contrast-light";
 pub const ENV_VAR: &str = "ZACESS_THEME";
 
 /// Short names accepted beside the id and the full name.
-const SHORT_NAMES: [(&str, &str); 8] = [
+const SHORT_NAMES: &[(&str, &str)] = &[
     ("deep-dark", "deep-contrast-dark"),
     ("deep-light", "deep-contrast-light"),
     ("hc-dark", "high-contrast-dark"),
@@ -23,10 +23,12 @@ const SHORT_NAMES: [(&str, &str); 8] = [
     ("light", "light"),
     ("yellow", "yellow-on-black"),
     ("cream", "cream"),
+    ("warm-dark", "warm-dark"),
+    ("warm-light", "warm-light"),
 ];
 
-/// The contrast floor for the High Contrast and Deep Contrast themes, the WCAG AAA level for
-/// text. People choose those themes for strength, so a scene keeps it there too.
+/// The WCAG AAA level for text, the palette's own rule for every theme that does not set a text
+/// contrast of its own. A theme at this floor or above draws its faintest shade more strongly.
 pub const STRONG_CONTRAST: f64 = 7.0;
 
 /// Hue and saturation of a colour, hue in degrees.
@@ -51,9 +53,30 @@ fn hue_and_saturation(colour: Rgb) -> (f32, f32) {
     (hue, saturation)
 }
 
+/// The colour with its OKLab lightness stepped away from the background until it keeps the
+/// floor, its hue and chroma unchanged apart from gamut clipping. None when no lightness reaches
+/// the floor.
+fn shift_to_floor(colour: Rgb, theme: &ThemeData, floor: f64) -> Option<Rgb> {
+    let lab = crate::pixels::Lab::from_rgb(colour);
+    let light_background = theme.background.luminance() > 0.5;
+    (1..=100).find_map(|step| {
+        let delta = step as f32 / 100.0;
+        let l = if light_background {
+            lab.l - delta
+        } else {
+            lab.l + delta
+        };
+        if !(0.0..=1.0).contains(&l) {
+            return None;
+        }
+        let candidate = crate::pixels::Lab { l, ..lab }.to_rgb();
+        (theme.contrast_of(candidate) >= floor).then_some(candidate)
+    })
+}
+
 /// The sixteen terminal colours of a theme with any colour below the theme's floor swapped for
-/// the closest palette colour that keeps it: first the bright or plain twin of the same slot,
-/// then the palette colour nearest in hue.
+/// the closest colour that keeps it: first the bright or plain twin of the same slot, then the
+/// slot's own hue at a lightness that keeps the floor, then the palette colour nearest in hue.
 fn fit_ansi(theme: &ThemeData) -> [Rgb; 16] {
     let floor = theme.floor();
     let keeps = |c: Rgb| theme.contrast_of(c) >= floor;
@@ -82,6 +105,13 @@ fn fit_ansi(theme: &ThemeData) -> [Rgb; 16] {
             *colour = twin;
             continue;
         }
+        // keep the slot's own hue and move only its lightness away from the background, so a
+        // yellow stays a deep ochre rather than turning into the muted ink it would otherwise
+        // borrow, which left two roles the same colour in Cream
+        if let Some(shifted) = shift_to_floor(*colour, theme, floor) {
+            *colour = shifted;
+            continue;
+        }
         let (hue, saturation) = hue_and_saturation(*colour);
         let grey = saturation < 0.15;
         *colour = candidates
@@ -105,14 +135,11 @@ fn fit_ansi(theme: &ThemeData) -> [Rgb; 16] {
 }
 
 impl ThemeData {
-    /// The contrast every colour a scene draws keeps against this theme's background: 7 to 1 on
-    /// the High Contrast and Deep Contrast themes, 4.5 to 1 on the others.
+    /// The contrast every colour a scene draws keeps against this theme's background: the text
+    /// contrast the palette sets for the theme (7 to 1 unless the theme asks for less), never
+    /// below the WCAG AA level of 4.5 to 1.
     pub fn floor(&self) -> f64 {
-        if self.name.contains("High Contrast") || self.name.contains("Deep Contrast") {
-            STRONG_CONTRAST
-        } else {
-            MIN_CONTRAST
-        }
+        self.text_contrast.max(MIN_CONTRAST)
     }
 
     /// A terminal colour, swapped for a stronger palette colour when it is below the floor.
@@ -126,8 +153,8 @@ impl ThemeData {
     }
 
     /// The faintest shade character a scene draws. A light shade covers about a quarter of the
-    /// cell, so it reads fainter than its measured colour; the High Contrast and Deep Contrast
-    /// themes use the medium shade instead.
+    /// cell, so it reads fainter than its measured colour; a theme with a 7 to 1 floor uses the
+    /// medium shade instead.
     pub fn faint_shade(&self) -> char {
         if self.floor() >= STRONG_CONTRAST {
             '\u{2592}'
@@ -254,6 +281,9 @@ impl ThemeData {
         ];
         colours.extend_from_slice(&self.syntax);
         colours.extend_from_slice(&self.ansi[1..]);
+        // the fitted terminal colours too: a slot below the floor is drawn in its fitted colour,
+        // which keeps the slot's hue at a readable lightness and so is never a palette entry
+        colours.extend((1..16).map(|slot| self.fit(slot)));
         colours.sort_unstable();
         colours.dedup();
         colours
@@ -267,7 +297,7 @@ impl ThemeData {
 
 /// Every theme in the palette's order.
 pub fn all() -> &'static [ThemeData] {
-    &THEMES
+    THEMES
 }
 
 pub fn default_theme() -> &'static ThemeData {
@@ -387,7 +417,7 @@ pub fn choose(choice: &Choice) -> Result<&'static ThemeData, String> {
 mod tests {
     use super::*;
 
-    const NAMES: [&str; 8] = [
+    const NAMES: [&str; 10] = [
         "Zacess Light",
         "Zacess Dark",
         "Zacess Yellow on Black",
@@ -396,13 +426,15 @@ mod tests {
         "Zacess High Contrast Light",
         "Zacess Deep Contrast Dark",
         "Zacess Deep Contrast Light",
+        "Zacess Warm Dark",
+        "Zacess Warm Light",
     ];
 
     #[test]
-    fn the_eight_themes_keep_the_palette_names() {
+    fn the_ten_themes_keep_the_palette_names() {
         let names: Vec<&str> = all().iter().map(|t| t.name).collect();
         assert_eq!(names, NAMES);
-        assert_eq!(PALETTE_VERSION, "0.5.0");
+        assert_eq!(PALETTE_VERSION, "1.0.0");
     }
 
     #[test]
@@ -410,7 +442,7 @@ mod tests {
         let mut shorts: Vec<&str> = all().iter().map(ThemeData::short).collect();
         shorts.sort_unstable();
         shorts.dedup();
-        assert_eq!(shorts.len(), 8);
+        assert_eq!(shorts.len(), all().len());
         assert_eq!(by_id("deep-contrast-dark").unwrap().short(), "deep-dark");
         assert_eq!(by_id("yellow-on-black").unwrap().short(), "yellow");
     }
@@ -591,16 +623,23 @@ mod tests {
     }
 
     #[test]
-    fn the_strong_themes_get_the_higher_floor() {
-        assert_eq!(
-            by_id("deep-contrast-light").unwrap().floor(),
-            STRONG_CONTRAST
-        );
-        assert_eq!(
-            by_id("high-contrast-dark").unwrap().floor(),
-            STRONG_CONTRAST
-        );
-        assert_eq!(by_id("cream").unwrap().floor(), MIN_CONTRAST);
+    fn the_floor_comes_from_the_palette_and_never_drops_for_the_first_eight_themes() {
+        for id in [
+            "light",
+            "dark",
+            "yellow-on-black",
+            "cream",
+            "high-contrast-dark",
+            "high-contrast-light",
+            "deep-contrast-dark",
+            "deep-contrast-light",
+        ] {
+            assert_eq!(by_id(id).unwrap().floor(), STRONG_CONTRAST, "{id}");
+        }
+        // the Warm pair asks for the AA level, softer on the eyes for long sessions
+        assert_eq!(by_id("warm-dark").unwrap().floor(), MIN_CONTRAST);
+        assert_eq!(by_id("warm-light").unwrap().floor(), MIN_CONTRAST);
+        assert_eq!(find("warm-light").map(|t| t.id), Some("warm-light"));
         // a colour already strong enough is left alone
         let deep = by_id("deep-contrast-dark").unwrap();
         assert_eq!(deep.bright_yellow(), deep.ansi[11]);
@@ -611,6 +650,35 @@ mod tests {
         for theme in all() {
             let dark_background = theme.background.luminance() < 0.5;
             assert_eq!(theme.dark, dark_background, "{}", theme.name);
+        }
+    }
+}
+
+#[cfg(test)]
+mod fit_tests {
+    use super::*;
+
+    // every fitted terminal colour keeps the floor and no two chromatic slots of a theme collapse
+    // into the muted ink, the failure Cream showed when yellow borrowed it
+    #[test]
+    fn fitted_colours_keep_the_floor_and_stay_off_the_muted_ink() {
+        for theme in all() {
+            let fitted = fit_ansi(theme);
+            for (slot, colour) in fitted.iter().enumerate().skip(1) {
+                assert!(
+                    theme.contrast_of(*colour) >= theme.floor(),
+                    "{} slot {slot} {} misses the floor",
+                    theme.id,
+                    colour.hex()
+                );
+                if (1..=6).contains(&slot) || (9..=14).contains(&slot) {
+                    assert_ne!(
+                        *colour, theme.muted,
+                        "{} slot {slot} became the muted ink",
+                        theme.id
+                    );
+                }
+            }
         }
     }
 }

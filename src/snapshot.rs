@@ -10,7 +10,7 @@ use crate::flash::{Meter, Verdict};
 use crate::frame::{Cell, Frame};
 use crate::report::{Item, Kind, Report};
 use crate::rng::Rng;
-use crate::scene::{Motion, Scene};
+use crate::scene::{Moment, Motion, Scene};
 use crate::theme::ThemeData;
 use crate::watch::view::{self, Phase, View};
 
@@ -140,6 +140,89 @@ fn block_shape(ch: char) -> Option<(&'static [Part], f32)> {
     Some(shape)
 }
 
+/// The colours of the upper and lower half of a cell, for the glyphs that split a cell into a
+/// top and a bottom half, plus whether those halves draw the whole cell. Anything else keeps its
+/// background halves and draws its glyph on top.
+fn cell_halves(cell: Cell, theme: &ThemeData) -> (Option<Rgb>, Option<Rgb>, bool) {
+    let fg = Some(cell_colour(cell, theme));
+    match cell.ch {
+        ' ' => (cell.bg, cell.bg, true),
+        '\u{2580}' => (fg, cell.bg, true),
+        '\u{2584}' => (cell.bg, fg, true),
+        '\u{2588}' => (fg, fg, true),
+        _ => (cell.bg, cell.bg, false),
+    }
+}
+
+/// The SVG rectangles for every cell background and half block in a frame, laid out on a grid of
+/// half rows. Neighbours of one colour on a half row share a rectangle and a rectangle carries on
+/// down through every half row with the same run, so a solid shape is one rectangle instead of a
+/// stack of slices whose edges a renderer smooths into faint lines. Text-only scenes set none,
+/// so their stills are unchanged.
+fn background_rects(frame: &Frame, theme: &ThemeData, left: f32, top: f32) -> String {
+    let width = frame.width();
+    let mut grid: Vec<Vec<Option<Rgb>>> = Vec::with_capacity(frame.height() * 2);
+    for row in frame.rows() {
+        let (upper, lower): (Vec<_>, Vec<_>) = row
+            .iter()
+            .map(|&cell| {
+                let (a, b, _) = cell_halves(cell, theme);
+                (a, b)
+            })
+            .unzip();
+        grid.push(upper);
+        grid.push(lower);
+    }
+    let half = ROW_HEIGHT / 2.0;
+    let mut out = String::new();
+    let mut emit = |x: usize, end: usize, colour: Rgb, from: usize, to: usize| {
+        out.push_str(&format!(
+            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\"/>\n",
+            round(left + x as f32 * CELL_WIDTH),
+            round(top + from as f32 * half),
+            round((end - x) as f32 * CELL_WIDTH),
+            round((to - from) as f32 * half),
+            colour.hex()
+        ));
+    };
+    // each open rectangle is (x, end, colour, first half row)
+    let mut open: Vec<(usize, usize, Rgb, usize)> = Vec::new();
+    for (r, line) in grid.iter().enumerate() {
+        let mut spans = Vec::new();
+        let mut x = 0;
+        while x < width {
+            let Some(colour) = line[x] else {
+                x += 1;
+                continue;
+            };
+            let mut end = x + 1;
+            while end < width && line[end] == Some(colour) {
+                end += 1;
+            }
+            spans.push((x, end, colour));
+            x = end;
+        }
+        let mut next = Vec::with_capacity(spans.len());
+        for (x, end, colour) in spans {
+            match open
+                .iter()
+                .position(|&(ox, oe, oc, _)| (ox, oe, oc) == (x, end, colour))
+            {
+                Some(i) => next.push(open.swap_remove(i)),
+                None => next.push((x, end, colour, r)),
+            }
+        }
+        for (x, end, colour, from) in open.drain(..) {
+            emit(x, end, colour, from, r);
+        }
+        open = next;
+    }
+    for (x, end, colour, from) in open {
+        emit(x, end, colour, from, grid.len());
+    }
+    out
+}
+
 /// The SVG rectangles for every block glyph in a frame. Neighbours on a row with the same glyph
 /// and colour share one rectangle, which keeps the files small.
 fn block_rects(frame: &Frame, theme: &ThemeData, left: f32, top: f32) -> String {
@@ -148,6 +231,10 @@ fn block_rects(frame: &Frame, theme: &ThemeData, left: f32, top: f32) -> String 
         let mut x = 0;
         while x < row.len() {
             let cell = row[x];
+            if cell_halves(cell, theme).2 {
+                x += 1;
+                continue;
+            }
             let Some((parts, opacity)) = block_shape(cell.ch) else {
                 x += 1;
                 continue;
@@ -265,7 +352,12 @@ text-anchor=\"middle\">{}</text>\n",
         theme.foreground.hex(),
         xml_escape(title)
     ));
+    // crisp edges snap every rectangle to whole device pixels, so two rectangles that meet at a
+    // fractional position never leave a smoothed seam between them
+    out.push_str("<g shape-rendering=\"crispEdges\">\n");
+    out.push_str(&background_rects(frame, theme, PAD, TITLE_BAR + PAD));
     out.push_str(&block_rects(frame, theme, PAD, TITLE_BAR + PAD));
+    out.push_str("</g>\n");
     out.push_str(&format!(
         "<g font-family=\"{font}\" font-size=\"{FONT_SIZE}\" xml:space=\"preserve\">\n"
     ));
@@ -294,6 +386,88 @@ fn round(value: f32) -> String {
     text.trim_end_matches('0').trim_end_matches('.').to_string()
 }
 
+/// The longest gap a run bridges with spaces. A space costs one byte and draws nothing, while a
+/// new run costs about 44 bytes of fields, so a run of one colour carries on across any gap
+/// shorter than that.
+const MAX_GAP: usize = 40;
+
+/// The runs of one layer of a frame, one colour at a time on each row. `pick` gives the glyph and
+/// colour a cell adds to the layer, if any. Runs of one colour bridge gaps of up to `MAX_GAP`
+/// cells with spaces, which draw nothing, so runs of a layer never overlap.
+fn layer_runs(frame: &Frame, pick: impl Fn(Cell) -> Option<(char, Rgb)>) -> Vec<Run> {
+    let mut out = Vec::new();
+    for (y, row) in frame.rows().enumerate() {
+        let mut open: Vec<(Run, usize)> = Vec::new();
+        let mut row_runs = Vec::new();
+        for (x, &cell) in row.iter().enumerate() {
+            let Some((ch, colour)) = pick(cell) else {
+                continue;
+            };
+            match open.iter_mut().find(|(run, _)| run.colour == colour) {
+                Some((run, end)) if x - *end <= MAX_GAP => {
+                    run.text.extend(std::iter::repeat_n(' ', x - *end));
+                    run.text.push(ch);
+                    *end = x + 1;
+                }
+                found => {
+                    if let Some((run, end)) = found {
+                        let done = std::mem::replace(
+                            run,
+                            Run {
+                                x,
+                                y,
+                                text: ch.to_string(),
+                                colour,
+                            },
+                        );
+                        *end = x + 1;
+                        row_runs.push(done);
+                    } else {
+                        open.push((
+                            Run {
+                                x,
+                                y,
+                                text: ch.to_string(),
+                                colour,
+                            },
+                            x + 1,
+                        ));
+                    }
+                }
+            }
+        }
+        row_runs.extend(open.into_iter().map(|(run, _)| run));
+        row_runs.sort_by_key(|run| run.x);
+        out.extend(row_runs);
+    }
+    out
+}
+
+/// The runs a page draws for one frame, in order: first every cell background other than the
+/// theme's as a full block, then every glyph over it. A pixel cell is its top pixel as the
+/// background and its bottom pixel as a lower half block, so a page that only knows runs of
+/// coloured text plays pixel scenes exactly. That way round each half block covers the line
+/// between its row and the next: a page that grows every block a little to hide gaps never
+/// smooths an edge against anything but the colours on either side of it, so rows show no seams
+/// even at a fractional zoom.
+pub fn frame_runs(frame: &Frame, theme: &ThemeData) -> Vec<Run> {
+    let mut runs = layer_runs(frame, |cell| {
+        let bg = cell.pixel_pair().map_or(cell.bg, |(top, _)| Some(top));
+        bg.filter(|&bg| bg != theme.background)
+            .map(|bg| ('\u{2588}', bg))
+    });
+    runs.extend(layer_runs(frame, |cell| match cell.pixel_pair() {
+        // every pixel cell with anything to draw gets its lower half block, even when both
+        // pixels match: a row of them overlaps edge to edge, so a block edge in the layer below
+        // is always painted over by one colour instead of two smoothed edges leaving a hairline
+        Some((top, bottom)) => {
+            (top != theme.background || bottom != theme.background).then_some(('\u{2584}', bottom))
+        }
+        None => (cell.ch != ' ').then(|| (cell.ch, cell_colour(cell, theme))),
+    }));
+    runs
+}
+
 /// Frames as compact JSON: the size, the rate, the background and each frame's runs.
 pub fn frames_json(frames: &[Frame], fps: u32, theme: &ThemeData) -> String {
     let (width, height) = frames.first().map_or((0, 0), |f| (f.width(), f.height()));
@@ -306,7 +480,7 @@ pub fn frames_json(frames: &[Frame], fps: u32, theme: &ThemeData) -> String {
             out.push(',');
         }
         out.push('[');
-        for (j, run) in runs(frame, theme).iter().enumerate() {
+        for (j, run) in frame_runs(frame, theme).iter().enumerate() {
             if j > 0 {
                 out.push(',');
             }
@@ -333,12 +507,28 @@ pub struct Shot<'a> {
     pub seed: u64,
     pub motion: Motion,
     pub state: Option<SnapshotState>,
+    /// Where a Lua scene's `ctx.clock` starts, in local seconds from 1970. It moves on with the
+    /// scene's time, so the same `--time` always shows the same clock.
+    pub clock: i64,
 }
 
 impl Shot<'_> {
     fn build(&self, rng: &mut Rng) -> Result<Box<dyn Scene>, String> {
-        self.catalogue
-            .create(self.scene, self.size.0, self.size.1, self.motion, rng)
+        crate::clock::with_fixed(self.clock, || {
+            self.catalogue
+                .create(self.scene, self.size.0, self.size.1, self.motion, rng)
+        })
+    }
+
+    /// Tells a freshly built scene about the result a watch mode shot shows, as the watch mode
+    /// does when a run finishes, so a Lua scene's `on_pass` or `on_fail` hook runs and the still
+    /// shows what the scene does at that moment. The caption the hook gives, if any, is kept.
+    fn announce(&self, scene: &mut dyn Scene) -> Option<String> {
+        let moment = match self.state? {
+            SnapshotState::Pass => Moment::Pass,
+            SnapshotState::Fail => Moment::Fail,
+        };
+        scene.caption_for(moment)
     }
 
     /// The sample report a watch mode shot shows.
@@ -373,14 +563,21 @@ impl Shot<'_> {
 
     /// Draws one frame of the scene, with the watch mode's banner, caption and status bar on
     /// top when a state is asked for.
-    fn draw(&self, scene: &dyn Scene, report: Option<&Report>, frame: &mut Frame) {
+    fn draw(
+        &self,
+        scene: &dyn Scene,
+        report: Option<&Report>,
+        hooked: Option<&str>,
+        frame: &mut Frame,
+    ) {
         frame.clear();
         scene.draw(frame, self.theme);
         if let Some(state) = self.state {
-            let caption = self
-                .catalogue
-                .find(self.scene)
-                .and_then(|e| e.captions.first().cloned());
+            let caption = hooked.map(str::to_string).or_else(|| {
+                self.catalogue
+                    .find(self.scene)
+                    .and_then(|e| e.captions.first().cloned())
+            });
             let view = View {
                 project: "my-project",
                 job: "check",
@@ -409,6 +606,7 @@ impl Shot<'_> {
     pub fn still(&self, time: f32) -> Result<Frame, String> {
         let mut rng = Rng::new(self.seed);
         let mut scene = self.build(&mut rng)?;
+        let hooked = self.announce(scene.as_mut());
         let steps = (time * STEP_RATE).round() as usize;
         for _ in 0..steps {
             scene.step(1.0 / STEP_RATE, &mut rng);
@@ -418,7 +616,12 @@ impl Shot<'_> {
         }
         let report = self.report();
         let mut frame = Frame::new(self.size.0, self.size.1);
-        self.draw(scene.as_ref(), report.as_ref(), &mut frame);
+        self.draw(
+            scene.as_ref(),
+            report.as_ref(),
+            hooked.as_deref(),
+            &mut frame,
+        );
         Ok(frame)
     }
 
@@ -427,6 +630,7 @@ impl Shot<'_> {
     pub fn frames(&self, time: f32, count: u32, fps: u32) -> Result<Vec<Frame>, String> {
         let mut rng = Rng::new(self.seed);
         let mut scene = self.build(&mut rng)?;
+        let hooked = self.announce(scene.as_mut());
         for _ in 0..(time * STEP_RATE).round() as usize {
             scene.step(1.0 / STEP_RATE, &mut rng);
         }
@@ -438,7 +642,12 @@ impl Shot<'_> {
         for _ in 0..count {
             scene.step(dt, &mut rng);
             meter.advance(dt);
-            self.draw(scene.as_ref(), report.as_ref(), &mut frame);
+            self.draw(
+                scene.as_ref(),
+                report.as_ref(),
+                hooked.as_deref(),
+                &mut frame,
+            );
             match (meter.judge(&frame, self.theme), frames.last()) {
                 (Verdict::Hold, Some(last)) => frames.push(last.clone()),
                 _ => frames.push(frame.clone()),
@@ -494,6 +703,7 @@ mod tests {
             seed: 1,
             motion: Motion::FULL,
             state: None,
+            clock: crate::clock::SNAPSHOT_START,
         }
     }
 
@@ -579,7 +789,8 @@ mod tests {
                     c.push(theme.background);
                     c
                 };
-                for cell in frame.cells() {
+                // pixel cells are background imagery made from the theme's ramps, not text
+                for cell in frame.cells().iter().filter(|c| !c.is_pixel()) {
                     let colour = cell_colour(*cell, theme);
                     assert!(
                         allowed.contains(&colour),
@@ -634,6 +845,65 @@ mod tests {
         fail.state = Some(SnapshotState::Fail);
         let text = fail.still(2.0).unwrap().to_text();
         assert!(text.contains("failing") && text.contains("E0308"), "{text}");
+    }
+
+    #[test]
+    fn a_watch_state_runs_the_lua_scenes_hook_with_the_snapshot_clock() {
+        let dir = std::env::temp_dir().join(format!("zacess-hook-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(
+            dir.join("hooked.lua"),
+            r#"local seen = "waiting"
+              return { kind = "general",
+                frame = function(ctx) put(0, 0, seen) end,
+                on_pass = function(ctx) seen = "passed at " .. ctx.clock.time; return "Hooked." end,
+                on_fail = function(ctx) seen = "failed at " .. ctx.clock.time end }"#,
+        )
+        .unwrap();
+        let catalogue = Catalogue::load(Some(&dir));
+        let theme = theme::default_theme();
+        let mut pass = shot(&catalogue, "hooked", theme);
+        pass.size = (80, 24);
+        pass.clock = crate::clock::parse_snapshot_clock("14:05").unwrap();
+        assert!(pass.still(1.0).unwrap().row_text(0).starts_with("waiting"));
+        pass.state = Some(SnapshotState::Pass);
+        let text = pass.still(90.0).unwrap().to_text();
+        assert!(text.starts_with("passed at 14:05"), "{text}");
+        assert!(text.contains("Hooked."), "{text}");
+        pass.state = Some(SnapshotState::Fail);
+        let text = pass.still(1.0).unwrap().to_text();
+        assert!(text.starts_with("failed at 14:05"), "{text}");
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn frame_runs_replay_every_pixel_exactly() {
+        let catalogue = Catalogue::built_in();
+        for theme in theme::all() {
+            let frame = shot(&catalogue, "koi-pond", theme).still(4.0).unwrap();
+            // replays the runs as a page does: each glyph paints its part of the cell in order
+            let (w, h) = (frame.width(), frame.height());
+            let mut halves = vec![(theme.background, theme.background); w * h];
+            for run in frame_runs(&frame, theme) {
+                for (i, ch) in run.text.chars().enumerate() {
+                    let cell = &mut halves[run.y * w + run.x + i];
+                    match ch {
+                        ' ' => {}
+                        '\u{2588}' => *cell = (run.colour, run.colour),
+                        '\u{2584}' => cell.1 = run.colour,
+                        _ => {}
+                    }
+                }
+            }
+            for y in 0..h {
+                for x in 0..w {
+                    let cell = frame.get(x as i32, y as i32).unwrap();
+                    if let Some(pair) = cell.pixel_pair() {
+                        assert_eq!(halves[y * w + x], pair, "{x},{y} in {}", theme.name);
+                    }
+                }
+            }
+        }
     }
 
     #[test]

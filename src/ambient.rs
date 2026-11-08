@@ -55,7 +55,7 @@ pub enum Ambience {
 
 /// Which ambience each built-in scene plays. A scene not in the table, such as a user's Lua
 /// scene, plays the night ambience, the quietest.
-const SCENE_AMBIENCE: [(&str, Ambience); 39] = [
+const SCENE_AMBIENCE: [(&str, Ambience); 65] = [
     ("sea", Ambience::Water),
     ("rain", Ambience::Rain),
     ("snow", Ambience::Wind),
@@ -66,6 +66,10 @@ const SCENE_AMBIENCE: [(&str, Ambience); 39] = [
     ("campfire", Ambience::Fire),
     ("waves", Ambience::Water),
     ("zacess", Ambience::Night),
+    ("forest-stream", Ambience::Water),
+    ("desert-night", Ambience::Wind),
+    ("rooftops", Ambience::Night),
+    ("lily-pads", Ambience::Water),
     ("koi-pond", Ambience::Water),
     ("harbour", Ambience::Water),
     ("lanterns", Ambience::Water),
@@ -84,6 +88,19 @@ const SCENE_AMBIENCE: [(&str, Ambience); 39] = [
     ("garden", Ambience::Night),
     ("tiles", Ambience::Night),
     ("ribbons", Ambience::Night),
+    ("sunflower-field", Ambience::Wind),
+    ("mountain-lake", Ambience::Water),
+    ("tide-pools", Ambience::Water),
+    ("paper-boats", Ambience::Water),
+    ("windmills", Ambience::Wind),
+    ("picnic", Ambience::Wind),
+    ("drone-landing", Ambience::Wind),
+    // a kitchen counter is indoors and quiet, so the quietest bed suits it best
+    ("kettle-boil", Ambience::Night),
+    // the pad stands on the shore, so the surf is the sound under the count
+    ("rocket-launch", Ambience::Water),
+    ("pit-stop", Ambience::Night),
+    ("pcb-bring-up", Ambience::Night),
     ("storm", Ambience::Rain),
     ("flood", Ambience::Water),
     ("listing-ship", Ambience::Water),
@@ -97,6 +114,17 @@ const SCENE_AMBIENCE: [(&str, Ambience); 39] = [
     ("traffic-jam", Ambience::Night),
     ("erosion", Ambience::Water),
     ("drought", Ambience::Wind),
+    ("volcano", Ambience::Fire),
+    ("rockslide", Ambience::Wind),
+    ("dust-storm", Ambience::Wind),
+    ("thin-ice", Ambience::Wind),
+    ("short-circuit", Ambience::Night),
+    ("overgrown", Ambience::Wind),
+    ("landing-abort", Ambience::Wind),
+    ("kettle-cold", Ambience::Night),
+    ("launch-scrub", Ambience::Water),
+    ("pit-stop-stuck", Ambience::Night),
+    ("dead-led", Ambience::Night),
 ];
 
 impl Ambience {
