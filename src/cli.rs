@@ -81,6 +81,8 @@ pub struct SnapshotOptions {
     pub seed: u64,
     pub motion: Option<Level>,
     pub reduced_motion: bool,
+    /// Where a Lua scene's clock starts, in local seconds from 1970; `None` for the default.
+    pub clock: Option<i64>,
 }
 
 impl Default for SnapshotOptions {
@@ -97,6 +99,7 @@ impl Default for SnapshotOptions {
             seed: 1,
             motion: None,
             reduced_motion: false,
+            clock: None,
         }
     }
 }
@@ -216,7 +219,7 @@ pub fn usage() -> String {
     };
     let mut text = String::from(
         "Usage: zacess-scenes [scene] [options]\n       zacess-scenes <command>\n\n\
-Calm animated scenes for the terminal in the Zacess themes.\n\nThe original scenes:\n",
+Calm animated scenes for the terminal in the Zacess themes.\n\nGeneral scenes, also shown while a build passes:\n",
     );
     text.push_str(&wrapped_names(&names(crate::scenes::Kind::General)));
     text.push_str("Pass scenes, also shown while a build passes:\n");
@@ -244,7 +247,7 @@ scene is {DEFAULT_SCENE}.\n\nCommands:\n\
   --list-scenes        Print the scenes\n\
   --fps <n>            Frames per second, 1 to {MAX_FPS} (default {DEFAULT_FPS})\n\
   --slow               Half speed\n\
-  --reduced-motion     Fewer and slower movements, no lightning and no flicker\n\
+  --reduced-motion     Fewer and slower movements, no lightning and a slower flicker\n\
   --duration <minutes> Stop after this many minutes\n\
   --shuffle            Move to another scene at random every few minutes (5 by default)\n\
   --every <minutes>    Minutes between scenes; also turns moving on, in list order\n\
@@ -400,6 +403,8 @@ Options:\n\
   --fps <n>            Frames a second for --frames, 1 to 30 (default 12)\n\
   --state <pass|fail>  Draw the watch mode's banner, caption and status bar with sample data\n\
   --seed <n>           Seed the random numbers (default 1)\n\
+  --clock <time>       The local time a Lua scene's ctx.clock starts at, as HH:MM or\n\
+                       YYYY-MM-DDTHH:MM (default Monday 1 June 2026 at 09:00)\n\
   --motion <level>     calm, standard or lively\n\
   --reduced-motion     Reduced motion\n\
   --out <path>         Write to a file instead of standard output\n"
@@ -697,6 +702,10 @@ fn parse_snapshot(args: impl Iterator<Item = String>) -> Result<Command, String>
                 options.motion = Some(parse_level(&flag, &value(&flag, inline, &mut args)?)?)
             }
             "--reduced-motion" => options.reduced_motion = true,
+            "--clock" => {
+                let text = value(&flag, inline, &mut args)?;
+                options.clock = Some(crate::clock::parse_snapshot_clock(&text)?);
+            }
             _ if flag.starts_with('-') => {
                 return Err(format!(
                     "unknown option {flag}. Run zacess-scenes snapshot --help for the options."

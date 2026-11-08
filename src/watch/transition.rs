@@ -53,8 +53,9 @@ pub fn compose(
             let dy = y as f32 + 0.5 - cy;
             let distance = (dx * dx + dy * dy).sqrt();
             if distance > radius + 0.6 {
+                // the whole cell is copied, so a pixel scene keeps its background colour too
                 if let Some(cell) = behind.get(x, y) {
-                    frame.put(x, y, cell.ch, cell.colour);
+                    frame.put_cell(x, y, cell);
                 }
             } else if distance > radius - 0.6 && !motion.calm && progress < 1.0 {
                 let h = hash(x, y);

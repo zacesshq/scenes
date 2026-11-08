@@ -6,9 +6,53 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-11-08
+
 ### Added
 
+- Every built-in scene is painted in solid pixels. A renderer in `src/pixels.rs` puts two pixels in each character cell as an upper half block on a coloured background, with shades mixed from the theme's own colours in the OKLab space. Background imagery stays below the 3 to 1 non-text floor and everything that carries meaning stands out at or above it, so with `NO_COLOR` the imagery drops away and the shapes keep their outline. In 256 colours each pixel is sent as its nearest table entry.
+- 26 new scenes, 65 in all: 14 general, 27 pass and 24 fail. Each has its own captions and background sound.
+  - The general scenes `forest-stream`, `desert-night`, `rooftops` and `lily-pads`.
+  - The pass scenes `sunflower-field`, `mountain-lake`, `tide-pools`, `paper-boats`, `windmills` and `picnic`.
+  - The fail scenes `volcano`, `rockslide`, `dust-storm`, `thin-ice`, `short-circuit` and `overgrown`.
+  - Five pass and fail pairs that share one picture and tell its story each way. In `drone-landing` a quadcopter maps the ground with a faint beam and settles on a marked pad; in `landing-abort` its scan finds no terrain match and it climbs away. In `kettle-boil` a kettle boils, clicks off and pours into a mug; in `kettle-cold` it clicks off cold beside a note to try again. In `rocket-launch` a rocket counts down and lifts off from a coastal pad; in `launch-scrub` it is held on the pad venting steam while the board reads HOLD. In `pit-stop` a race car has its wheels changed and leaves as the lollipop lifts; in `pit-stop-stuck` one wheel will not come off while the time on the board climbs. In `pcb-bring-up` a board on a bench lights its LEDs in turn up to POWER GOOD; in `dead-led` one LED stays dark and a probe moves to it.
+- A light-theme look for many scenes, chosen from the theme rather than only recoloured: a day, a dawn or a sunrise in place of a night or a dusk, with its own sky, light and details. Each scene's section in `docs/scenes.md` says what changes.
+- Zacess Warm Dark and Zacess Warm Light from Zacess Themes 0.12.1, with the short names `warm-dark` and `warm-light`.
+- Lua scenes can paint solid pixels on the same two-pixels-to-a-cell canvas as the built-in scenes with `ctx.pixel`, `ctx.rect`, `ctx.disc`, `ctx.line` and `ctx.blend`, each taking a palette role and a strength from the background to the role's full colour. Text drawn over a picture keeps its full contrast or falls back to the plain background. Pixels pass the same flash meter as text. Every shape is cut to the canvas before it is painted and one frame may make at most 50,000 pixel calls that between them touch at most 64 screens' worth of pixels. Past that the rest of the frame's imagery is left out, so even a frame of screen-sized discs paints in a few milliseconds.
+- Lua scenes can read the local date and time from `ctx.clock`: the hour, minute and second, the date, the weekday and month names and ready-made `time` and `date` strings. It is refreshed once a second and is `nil` when the time zone is unknown.
+- `snapshot --clock` sets where a Lua scene's clock starts, as `HH:MM` or `YYYY-MM-DDTHH:MM`. Without it a snapshot's clock starts at Monday 1 June 2026 at 09:00 and moves on with `--time`, so a still is the same on every machine. Years run from 1 to 9999. A year outside that range or a day the month does not have is refused with a message that names it.
+- `snapshot --state pass` and `--state fail` run a Lua scene's `on_pass` or `on_fail` hook as it starts, as the watch mode does when a run finishes. The still shows the caption the hook returns.
+- One shared pixel check, `check_pixel_scene`, that every scene passes in all ten themes: sizes from one cell to 400 by 120, the flash limits at every motion setting, a still picture while paused, the imagery rules, the outline with colour off, the 256 colour fallback, text over the scene at the floor, fewer changes under reduced motion and the same pixels from the same seed.
 - The Zacess Scenes mark in `assets/` in light, dark, automatic and single colour versions, with a light and a dark lockup at the head of the README. A dark and a light banner and a 1280 by 640 social preview image sit beside them.
+
+### Changed
+
+- The embedded palette moves to Zacess Themes 1.0.0, which gives Zacess Warm Light its final code, selection, current line and find match colours.
+- The original ten scenes and the 29 earlier pass and fail scenes are repainted in pixels and many have new compositions. Among them `sea` has fish with fins and forked tails, `rain` is a lamplit wet street with a walker under an umbrella, `fireflies` is a meadow at dusk under a great tree, `zacess` floats the mark large in the middle of the screen, `storm` has rolling cloud over open country and a tree in full leaf, `koi-pond` has koi seen from above with fins and classic patterns, `mountain-lake` is a lake at first light, `leak` is a lit basement, `corrosion` is rusting riveted steel, `traffic-jam` is a side-on queue at a red signal and `fog` is a road at dusk where a wall of fog rolls in.
+- A terminal colour below a theme's floor keeps its hue: it is replaced by its bright or plain twin when that keeps the floor and otherwise only its lightness moves until it reaches the floor. Before, it borrowed the nearest palette colour, which on Cream turned the yellow into the muted ink and left two roles the same colour.
+- Each theme's contrast floor comes from the palette's text contrast for that theme rather than from its name: 7 to 1 on the first eight themes and 4.5 to 1 on the Warm pair. Zacess Light, Dark, Yellow on Black and Cream rise from 4.5 to 1 to 7 to 1. No theme's floor went down.
+- The palette copy is Zacess Themes 0.12.1 and `scripts/build-palette.py` takes any number of themes.
+- The showcase frames in `docs/frames` play six seconds at 6 frames a second, which keeps each file between about 0.7 and 1.1 MB.
+- The crate, Homebrew and winget descriptions name the ten Zacess themes and the winget description the 65 scenes.
+- Six scenes are redrawn to a higher standard. `forest-stream` winds out from between bushes on the horizon between mossy banks, with trunks at three depths and a bright daytime wood on light themes. `corrosion` lifts its steel so rivets and seams read on dark themes. In `volcano` the embers rise one above another up the plume, the lava keeps an orange hue on dark themes and the cone and ranges stand out of the dusk. `aurora` has a far and a near range of peaks, each with a lit and a shaded face and ragged snow caps. In `lanterns` each near and middle lantern rises in a column of its own, so two never merge into one shape. In `pit-stop` and `pit-stop-stuck` a larger car and crew fill the frame at 80 by 24 and 200 by 50, with the far side crew and the lollipop behind the car and its board clear of the wheels, a rear wing on a pylon and the tyre stacks kept clear.
+- The forest light shafts in `forest-stream`, the curtains' breathing in `aurora` and how often a frog hops in `lily-pads` are held to the standard pace on lively, where they came round faster before. `ACCESSIBILITY.md` says so.
+- `--help` heads the first list of scenes "General scenes, also shown while a build passes" in place of "The original scenes". The `--reduced-motion` help says the flicker is slower rather than gone.
+- `ACCESSIBILITY.md`, the README, CONTRIBUTING, `docs/lua.md`, `docs/themes.md` and the winget description state the contrast rules for pixel art: text keeps the theme's floor, the pixel shapes that carry meaning keep at least 3 to 1 against the background and background imagery stays below 3 to 1.
+- `docs/scenes.md` describes what each scene draws and its flashing row from the code. The gallery stills and the showcase frames are made again for every redrawn scene.
+- The bug report and accessibility problem forms list the 26 new scenes and both Warm themes and their version placeholders read 0.6.0. The scene idea form asks how a scene looks on a light theme and states the contrast rules for pixel art in all ten themes.
+- SUPPORT.md gives support@zacess.com for help with a scene, watch mode or follow mode and for private accessibility reports, as does the accessibility problem form, with contact@zacess.com kept for anything else.
+
+### Fixed
+
+- SVG stills and JSON frames no longer show faint seams between rows. A still draws a solid shape as one rectangle over the half rows it covers and a JSON frame gives each pixel cell its top pixel as the background and its bottom pixel as a lower half block, which overlaps the line to the next row.
+- The JSON frames from `snapshot --frames` carry each cell's background, so a page playing them shows both pixels of every cell.
+- The watch mode's opening from a fail scene to a pass scene copies whole cells, so the scene behind keeps its backgrounds.
+- The Lua instruction budget test counts instructions rather than wall-clock time, so it passes on a busy machine.
+
+### Removed
+
+- The generic warning triangle, from every scene that carried one. Where a scene still needs words they are on a board of their own, such as BRIDGE OUT on `broken-bridge`, KEEP BACK on `erosion` and ROAD CLOSED on `traffic-jam`; the rest show what is wrong in the picture itself.
+- The `! tangled` tag in `tangle` and the pressure gauge and wet floor sign in `leak`.
 
 ## [0.6.0] - 2026-11-03
 

@@ -1,17 +1,23 @@
-//! Erosion: a cliff above the sea crumbling slowly. Every few seconds a piece of the face breaks
-//! away and tumbles into the water, the edge creeping back until a fence on top is left hanging
-//! over the drop. After a few minutes the cliff reaches harder rock and holds, with the odd
-//! pebble still falling and the waves still breaking below.
+//! Erosion: a layered chalk cliff above the sea, crumbling slowly. Every few seconds a piece of
+//! the face breaks away and tumbles into the water, the edge creeping back until a fence on top
+//! is left hanging down the drop. After a few minutes the cliff reaches harder rock and holds,
+//! with the odd pebble still falling and the waves still breaking white at its foot.
+//!
+//! The sky, the sea and the rock are tints of the background held below the non-text floor. The
+//! fence, the KEEP BACK board, the cottage and the falling stones are solid, so with colour off the fence
+//! is seen hanging over the edge.
 
-use super::wrap;
+use super::paint::{self, Blender, Overcast, clouds, gradient, line, shaded, solid, unit};
+use super::{cycle, wrap};
+use crate::colour::Rgb;
 use crate::frame::Frame;
+use crate::pixels::{Canvas, Ramp, Shades, mix};
 use crate::rng::Rng;
 use crate::scene::{Motion, Scene};
 use crate::theme::ThemeData;
 use crate::watch::view::{error_colour, warning_colour};
 
-pub const SUMMARY: &str =
-    "A cliff edge crumbling into the sea, stones tumbling down and a fence left hanging";
+pub const SUMMARY: &str = "A layered cliff crumbling into the sea, stones tumbling down and a fence left hanging over the edge";
 
 pub const CAPTIONS: &[&str] = &[
     "Something gave way. Start with the first error.",
@@ -25,10 +31,23 @@ pub const CAPTIONS: &[&str] = &[
 pub const CRUMBLE_PERIOD: f32 = 2.2;
 /// Seconds between two pebbles once the cliff has stopped eroding.
 const PEBBLE_PERIOD: f32 = 7.0;
-/// How long a splash shows. Its cell changes twice in this time.
+/// How long a splash shows. Its pixels change twice in this time.
 pub const SPLASH_LENGTH: f32 = 0.7;
 /// The share of the screen's width the edge can creep back before it reaches hard rock.
 const MOST_LOSS: f32 = 0.14;
+
+/// The words on the board well back from the edge.
+const BOARD_TEXT: &str = "KEEP BACK";
+
+const COTTAGE: [&str; 7] = [
+    "....rr....",
+    "..rrrrrr..",
+    "rrrrrrrrrr",
+    ".wwwwwwww.",
+    ".wyywwyyw.",
+    ".wyywdwyw.",
+    ".wwwwdwww.",
+];
 
 #[derive(Clone, Debug)]
 struct Stone {
@@ -38,17 +57,106 @@ struct Stone {
     vy: f32,
 }
 
+/// The cliff's colours in one theme.
+struct Colours {
+    overcast: Overcast,
+    sea: Ramp,
+    crest: Rgb,
+    strata: [Rgb; 3],
+    face: Rgb,
+    shadow: Rgb,
+    grass: (Rgb, Rgb),
+    post: Rgb,
+    hanging: Rgb,
+    stone: Rgb,
+    cottage: [(char, Rgb); 4],
+    board: Rgb,
+    plain: Rgb,
+}
+
+impl Colours {
+    fn new(theme: &ThemeData) -> Self {
+        let shades = Shades::new(theme);
+        let chalk = mix(theme.muted, theme.yellow(), 0.3);
+        let (sea_top, sea_deep, strata, face, shadow, grass) = if theme.dark {
+            (
+                shades.tint(theme.cyan(), 0.45, 2.2),
+                shades.tint(theme.blue(), 0.25, 1.4),
+                [
+                    shades.tint(chalk, 0.4, 2.1),
+                    shades.tint(chalk, 0.3, 1.8),
+                    shades.tint(chalk, 0.5, 2.4),
+                ],
+                shades.tint(chalk, 0.65, 2.85),
+                shades.tint(chalk, 0.18, 1.4),
+                (
+                    shades.tint(theme.green(), 0.55, 2.5),
+                    shades.tint(theme.green(), 0.35, 1.9),
+                ),
+            )
+        } else {
+            (
+                shades.tint(theme.cyan(), 0.35, 1.8),
+                shades.tint(theme.blue(), 0.7, 2.75),
+                [
+                    shades.tint(chalk, 0.4, 1.9),
+                    shades.tint(chalk, 0.55, 2.3),
+                    shades.tint(chalk, 0.3, 1.6),
+                ],
+                shades.tint(chalk, 0.15, 1.25),
+                shades.tint(chalk, 0.75, 2.85),
+                (
+                    shades.tint(theme.green(), 0.55, 2.3),
+                    shades.tint(theme.green(), 0.75, 2.8),
+                ),
+            )
+        };
+        let crest = if theme.dark {
+            shades.tint(theme.foreground, 0.6, 2.9)
+        } else {
+            mix(sea_top, theme.background, 0.7)
+        };
+        let (_, roof, _) = shaded(theme, theme.red());
+        Self {
+            overcast: Overcast::new(theme),
+            sea: Ramp::new(sea_top, sea_deep, 8),
+            crest,
+            strata,
+            face,
+            shadow,
+            grass,
+            post: solid(
+                theme,
+                mix(theme.muted, theme.yellow(), 0.3),
+                shades.darkest(),
+                0.2,
+            ),
+            hanging: warning_colour(theme),
+            stone: solid(theme, theme.muted, shades.darkest(), 0.2),
+            board: error_colour(theme),
+            plain: theme.background,
+            cottage: [
+                ('r', roof),
+                ('w', theme.foreground),
+                ('y', theme.bright_blue()),
+                ('d', solid(theme, theme.muted, shades.darkest(), 0.5)),
+            ],
+        }
+    }
+}
+
 pub struct Erosion {
     width: usize,
     height: usize,
     motion: Motion,
     t: f64,
-    /// How far each row of the face has worn back, as a share of the most it can.
+    seed: u32,
+    /// How far each pixel row of the face has worn back, as a share of the most it can.
     loss: Vec<f32>,
     stones: Vec<Stone>,
     splashes: Vec<(i32, f32)>,
     since_crumble: f32,
-    clouds: Vec<(f32, i32, usize)>,
+    cloud_drift: f32,
     roughness: Vec<i32>,
 }
 
@@ -59,39 +167,44 @@ impl Erosion {
             height: 1,
             motion,
             t: 0.0,
+            seed: (rng.next_u64() >> 32) as u32,
             loss: Vec::new(),
             stones: Vec::new(),
             splashes: Vec::new(),
             since_crumble: 0.0,
-            clouds: Vec::new(),
+            cloud_drift: 0.0,
             roughness: Vec::new(),
         };
         cliff.resize(width, height, rng);
         cliff
     }
 
-    /// The row of the clifftop.
+    fn tall(&self) -> i32 {
+        self.height as i32 * 2
+    }
+
+    /// The pixel row of the clifftop.
     fn top(&self) -> i32 {
-        ((self.height as f32 * 0.38) as i32).max(2)
+        ((self.tall() as f32 * 0.38) as i32).max(4)
     }
 
-    /// The first row of sea.
+    /// The first pixel row of sea.
     fn sea(&self) -> i32 {
-        let h = self.height as i32;
-        (h - (h / 4).max(2)).max(self.top() + 2)
+        let tall = self.tall();
+        (tall - (tall / 4).max(4)).max(self.top() + 4)
     }
 
-    /// The most cells the face can wear back.
+    /// The most pixels the face can wear back.
     fn most_loss(&self) -> f32 {
         (self.width as f32 * MOST_LOSS).max(2.0)
     }
 
-    /// The column of the face on a row, from the start shape less what has worn away.
+    /// The column of the face on a pixel row, from the start shape less what has worn away.
     fn edge(&self, y: i32) -> i32 {
         let base = (self.width as f32 * 0.5) as i32;
-        let rough = self.roughness.get(y as usize).copied().unwrap_or(0);
+        let rough = self.roughness.get(y.max(0) as usize).copied().unwrap_or(0);
         // the foot of the cliff runs out a little under the water
-        let foot = (y - self.sea() + 1).max(0);
+        let foot = (y - self.sea() + 1).max(0) / 2;
         // the shore below the water wears back with the bottom of the face
         let worn_row = y.min(self.sea() - 1).max(0) as usize;
         let worn = self.loss.get(worn_row).copied().unwrap_or(0.0) * self.most_loss();
@@ -114,8 +227,8 @@ impl Erosion {
     /// The fence posts, from back to front, ending at the original edge.
     fn fence_posts(&self) -> Vec<i32> {
         let start = (self.width as f32 * 0.5) as i32 - 1;
-        let count = (self.width as i32 / 12).clamp(2, 7);
-        (0..count).map(|i| start - (count - 1 - i) * 3).collect()
+        let count = (self.width as i32 / 12).clamp(2, 6);
+        (0..count).map(|i| start - (count - 1 - i) * 4).collect()
     }
 
     /// Breaks one piece from the face, top and bottom rows wearing faster than the middle.
@@ -130,7 +243,13 @@ impl Erosion {
         } else {
             let weights: Vec<f32> = rows
                 .iter()
-                .map(|&y| if y == top || y >= sea - 2 { 2.0 } else { 1.0 })
+                .map(|&y| {
+                    if y <= top + 1 || y >= sea - 3 {
+                        2.0
+                    } else {
+                        1.0
+                    }
+                })
                 .collect();
             let total: f32 = weights.iter().sum();
             let mut pick = rng.range(0.0, total);
@@ -143,9 +262,12 @@ impl Erosion {
                 pick -= w;
             }
             let step = 1.0 / self.most_loss();
-            let row = &mut self.loss[chosen as usize];
-            *row = (*row + step).min(1.0);
-            // the face stays rough but continuous: no row may stand more than two cells out
+            // a piece takes a few rows together, so the face breaks in chunks, not slivers
+            for y in chosen..(chosen + 2).min(sea) {
+                let row = &mut self.loss[y as usize];
+                *row = (*row + step).min(1.0);
+            }
+            // the face stays rough but continuous: no row may stand more than two pixels out
             // from its neighbours, so a cut can bring the rows around it down with it
             for _ in 0..(sea - top) {
                 let mut settled = true;
@@ -167,9 +289,144 @@ impl Erosion {
         self.stones.push(Stone {
             x: self.edge(from) as f32 + 1.0,
             y: from as f32,
-            vx: rng.range(0.6, 1.6),
+            vx: rng.range(1.2, 3.2),
             vy: 0.0,
         });
+    }
+
+    fn paint(&self, canvas: &mut Canvas, c: &Colours) {
+        let mut mixer = Blender::new(8);
+        let wide = canvas.width() as i32;
+        let tall = canvas.height() as i32;
+        let top = self.top();
+        let sea = self.sea();
+        gradient(canvas, &c.overcast.sky, 0, sea);
+        clouds(
+            canvas,
+            &mut mixer,
+            &c.overcast.cloud,
+            -2,
+            (top as f32 * 0.9) as i32,
+            self.cloud_drift,
+            self.seed,
+            0.5,
+        );
+        // the sea, its waves rolling in towards the cliff
+        let speed = self.motion.speed();
+        let span = (tall - sea).max(1) as f32;
+        for y in sea..tall {
+            let depth = (y - sea) as f32 / span;
+            let drift = cycle(self.t, (1.0 + 0.4 * depth) * speed / 3.0);
+            for x in 0..wide {
+                let xf = x as f32;
+                let v = 0.6 * (xf / 4.5 + drift + depth * 6.0).sin()
+                    + 0.4 * (xf / 2.1 + drift * 1.6 + depth * 9.0).sin();
+                let lift = ((v - 0.55) / 0.4).clamp(0.0, 1.0) * (1.0 - depth * 0.5);
+                canvas.set(x, y, mixer.mix(c.sea.at(depth), c.crest, lift));
+            }
+        }
+        // the cliff: layered rock lit on its face, grass along the top
+        for y in top..tall {
+            let edge = self.edge(y).min(wide);
+            for x in 0..edge {
+                let wobble = (unit(x / 5, y / 3, self.seed) * 2.0) as i32;
+                let band = ((y + wobble) / 3).rem_euclid(3) as usize;
+                let colour = if x >= edge - 1 {
+                    c.face
+                } else if x >= edge - 3 && y > top + 1 {
+                    mixer.mix(c.strata[band], c.shadow, 0.5)
+                } else {
+                    c.strata[band]
+                };
+                canvas.set(x, y, colour);
+            }
+            if y < top + 2 {
+                for x in 0..edge {
+                    canvas.set(x, y, if y == top { c.grass.0 } else { c.grass.1 });
+                }
+            }
+        }
+        // surf breaking white at the foot of the cliff
+        for k in 0..3 {
+            let x = self.edge(sea + k) + 1 + k;
+            canvas.set(x, sea + k, c.crest);
+            canvas.set(x + 1, sea + k, c.crest);
+        }
+        // the cottage, far back from the edge and still safe
+        if self.width >= 50 && top >= 9 {
+            canvas.sprite(2, top - COTTAGE.len() as i32, &COTTAGE, &c.cottage);
+        }
+        // the fence: posts on solid ground stand up, the ones past the edge hang down the face
+        let edge = self.edge(top);
+        let posts = self.fence_posts();
+        let mut hanging = 0;
+        for (i, &x) in posts.iter().enumerate() {
+            if x < edge {
+                canvas.fill_rect(x, top - 4, 1, 4, c.post);
+                if let Some(&next) = posts.get(i + 1).filter(|&&n| n < edge) {
+                    for rail in x + 1..next {
+                        canvas.set(rail, top - 3, c.post);
+                        canvas.set(rail, top - 1, c.post);
+                    }
+                }
+            } else {
+                hanging += 1;
+            }
+        }
+        // the hanging length follows the face down, its posts dangling crosswise
+        let mut last = (edge as f32, top as f32 - 2.0);
+        for i in 0..(hanging.min(3) * 3 + 2) {
+            let y = top + i;
+            if y >= sea {
+                break;
+            }
+            let here = ((self.edge(y) + 1 + i % 2) as f32, y as f32);
+            line(canvas, last, here, 1, c.hanging);
+            if i % 4 == 3 {
+                canvas.fill_rect(here.0 as i32, y, 3, 1, c.hanging);
+            }
+            last = here;
+        }
+        // a KEEP BACK board on a post well back from the edge, framed in the error colour with
+        // its middle left plain for the words written over it after the canvas
+        if let (Some(sx), Some(row)) = (self.sign_x(), self.board_row()) {
+            let len = BOARD_TEXT.len() as i32;
+            let left = sx - len / 2 - 2;
+            let board_top = 2 * row - 1;
+            canvas.fill_rect(left, board_top, len + 4, 4, c.board);
+            canvas.fill_rect(left + 1, board_top + 1, len + 2, 2, c.plain);
+            canvas.fill_rect(sx, board_top + 4, 1, top - board_top - 4, c.post);
+        }
+
+        for stone in &self.stones {
+            canvas.fill_rect(
+                stone.x.round() as i32,
+                stone.y.floor() as i32,
+                2,
+                2,
+                c.stone,
+            );
+        }
+        for &(x, age) in &self.splashes {
+            if age < SPLASH_LENGTH / 2.0 {
+                canvas.fill_rect(x, sea - 1, 2, 2, c.crest);
+            } else {
+                canvas.set(x - 2, sea - 1, c.crest);
+                canvas.set(x + 3, sea - 1, c.crest);
+            }
+        }
+    }
+
+    fn sign_x(&self) -> Option<i32> {
+        let sign = self.fence_posts()[0] - 4;
+        (sign >= 15 && self.top() >= 14).then_some(sign)
+    }
+
+    /// The text row of the KEEP BACK board, with its frame clear of the top edge and its foot
+    /// a post's height above the clifftop.
+    fn board_row(&self) -> Option<i32> {
+        let row = (self.top() - 10) / 2;
+        (row >= 1).then_some(row)
     }
 }
 
@@ -181,17 +438,18 @@ impl Scene for Erosion {
     fn resize(&mut self, width: usize, height: usize, rng: &mut Rng) {
         // what has worn away is kept, row for row by its height on the screen
         let old = std::mem::take(&mut self.loss);
-        let old_height = self.height.max(1);
+        let old_rows = (self.height * 2).max(1);
         self.width = width.max(1);
         self.height = height.max(1);
-        self.loss = (0..self.height)
+        let rows = self.height * 2;
+        self.loss = (0..rows)
             .map(|y| {
-                let from = y * old_height / self.height;
+                let from = y * old_rows / rows;
                 old.get(from).copied().unwrap_or(0.0)
             })
             .collect();
         let mut wobble = 0_i32;
-        self.roughness = (0..self.height)
+        self.roughness = (0..rows)
             .map(|_| {
                 wobble = (wobble + rng.below(3) as i32 - 1).clamp(-1, 1);
                 wobble
@@ -199,48 +457,33 @@ impl Scene for Erosion {
             .collect();
         self.stones.clear();
         self.splashes.clear();
-        let sky = (self.top() - 2).max(1) as usize;
-        let count = self.motion.scaled((self.width / 35).max(1));
-        self.clouds = (0..count)
-            .map(|_| {
-                (
-                    rng.range(0.0, self.width as f32),
-                    rng.below(sky) as i32,
-                    5 + rng.below(9),
-                )
-            })
-            .collect();
     }
 
     fn step(&mut self, dt: f32, rng: &mut Rng) {
         self.t += f64::from(dt);
         let speed = self.motion.speed();
-        let width = self.width as f32;
-        for cloud in &mut self.clouds {
-            cloud.0 = wrap(cloud.0 + 0.4 * speed * dt + 16.0, width + 32.0) - 16.0;
-        }
+        self.cloud_drift = wrap(self.cloud_drift + 0.8 * speed * dt, 100_000.0);
         self.since_crumble += dt;
         // a screen too short for a cliff and a sea has nothing to wear away
-        if self.since_crumble >= self.period() && (self.sea() as usize) < self.height {
+        if self.since_crumble >= self.period() && self.sea() < self.tall() {
             self.since_crumble = 0.0;
             self.crumble(rng);
         }
         let sea = self.sea() as f32;
-        let self_edges: Vec<i32> = (0..self.height as i32 + 1).map(|y| self.edge(y)).collect();
+        let edges: Vec<i32> = (0..=self.tall()).map(|y| self.edge(y)).collect();
         let mut landed = Vec::new();
         for stone in &mut self.stones {
-            stone.vy += 9.0 * speed * dt;
+            stone.vy += 18.0 * speed * dt;
             stone.x += stone.vx * speed * dt;
             stone.y += stone.vy * dt;
-            stone.x = stone
-                .x
-                .max(self_edges[(stone.y as usize).min(self_edges.len() - 1)] as f32 + 1.0);
+            let row = (stone.y.max(0.0) as usize).min(edges.len() - 1);
+            stone.x = stone.x.max(edges[row] as f32 + 1.0);
             if stone.y >= sea {
                 landed.push(stone.x.round() as i32);
             }
         }
         self.stones.retain(|s| s.y < sea);
-        let foot = self.edge(self.sea()) + 2;
+        let foot = self.edge(self.sea()) + 3;
         for x in landed {
             self.splashes.push((x.max(foot), 0.0));
         }
@@ -252,119 +495,13 @@ impl Scene for Erosion {
     }
 
     fn draw(&self, frame: &mut Frame, theme: &ThemeData) {
-        let width = self.width as i32;
-        let height = self.height as i32;
-        let top = self.top();
-        let sea = self.sea();
-        let speed = self.motion.speed();
-
-        for &(x, y, len) in &self.clouds {
-            for i in 0..len as i32 {
-                frame.put(x.round() as i32 + i, y, '~', Some(theme.grey()));
-            }
-        }
-
-        // the sea, its waves rolling in towards the cliff
-        for y in sea..height {
-            let depth = (y - sea) as f32;
-            let drift = super::cycle(self.t, (1.0 + 0.3 * depth) * speed / 6.0);
-            let long = 6.0 + (y % 3) as f32 * 1.5;
-            for x in 0..width {
-                let xf = x as f32;
-                let v = 0.6 * (xf / long + drift + depth * 2.39).sin()
-                    + 0.4 * (xf / 2.7 + drift * 1.6 + depth * 4.1).sin();
-                if v > 0.6 {
-                    frame.put(x, y, '~', Some(theme.cyan()));
-                } else if v > 0.15 {
-                    frame.put(x, y, '-', Some(theme.blue()));
-                }
-            }
-        }
-
-        // the cliff: rock behind a rough face, with the grass along the top
-        for y in top..height {
-            let edge = self.edge(y).min(width);
-            for x in 0..edge {
-                frame.put(x, y, theme.faint_shade(), Some(theme.grey()));
-            }
-            if y == top {
-                for x in 0..edge {
-                    let ch = if x % 3 == 0 { '"' } else { ',' };
-                    frame.put(x, y, ch, Some(theme.green()));
-                }
-            }
-            let above = if y == top { edge } else { self.edge(y - 1) };
-            let ch = match edge.cmp(&above) {
-                std::cmp::Ordering::Greater => '\\',
-                std::cmp::Ordering::Less => '/',
-                std::cmp::Ordering::Equal => '|',
-            };
-            frame.put(edge, y, ch, Some(theme.yellow()));
-        }
-        // surf breaking at the foot of the cliff
-        frame.put(self.edge(sea) + 1, sea, '*', Some(theme.foreground));
-
-        // the fence: posts on solid ground stand up, the ones past the edge hang down the face
-        if top >= 1 {
-            let edge = self.edge(top);
-            let posts = self.fence_posts();
-            let mut hanging = 0;
-            for (i, &x) in posts.iter().enumerate() {
-                if x < edge {
-                    frame.put(x, top - 1, '+', Some(theme.foreground));
-                    if let Some(&next) = posts.get(i + 1).filter(|&&n| n < edge) {
-                        for rail in x + 1..next {
-                            frame.put(rail, top - 1, '-', Some(theme.foreground));
-                        }
-                    }
-                } else {
-                    hanging += 1;
-                }
-            }
-            // the hanging length follows the face down; only the last few posts still hang
-            for i in 0..(hanging.min(3) * 2) {
-                let y = top + i;
-                if y >= sea {
-                    break;
-                }
-                let ch = if i % 2 == 0 { '\\' } else { '+' };
-                frame.put(self.edge(y) + 1, y, ch, Some(warning_colour(theme)));
-            }
-            // a warning sign well back from the edge
-            let sign = posts[0] - 6;
-            if sign >= 6 && top >= 2 {
-                frame.put_str(sign, top - 2, "/!\\", Some(warning_colour(theme)));
-                frame.put(sign + 1, top - 1, '|', Some(theme.foreground));
-                if sign >= 12 && top >= 3 {
-                    frame.put_str(sign - 3, top - 3, "KEEP BACK", Some(error_colour(theme)));
-                }
-            }
-            // a cottage far back from the edge, still safe
-            if self.width >= 50 && top >= 4 {
-                frame.put_sprite(
-                    2,
-                    top - 3,
-                    &[" /\\ ", "/__\\", "|[]|"],
-                    Some(theme.foreground),
-                );
-            }
-        }
-
-        for stone in &self.stones {
-            frame.put(
-                stone.x.round() as i32,
-                stone.y.floor() as i32,
-                'o',
-                Some(theme.muted),
-            );
-        }
-        for &(x, age) in &self.splashes {
-            if age < SPLASH_LENGTH / 2.0 {
-                frame.put(x, sea, 'o', Some(theme.bright_cyan()));
-            } else {
-                frame.put(x - 1, sea, '(', Some(theme.cyan()));
-                frame.put(x + 1, sea, ')', Some(theme.cyan()));
-            }
+        let colours = Colours::new(theme);
+        let mut canvas = Canvas::for_frame(frame, theme.background);
+        self.paint(&mut canvas, &colours);
+        canvas.blit(frame);
+        if let (Some(sx), Some(row)) = (self.sign_x(), self.board_row()) {
+            let x = sx - BOARD_TEXT.len() as i32 / 2;
+            paint::label(frame, x, row, BOARD_TEXT, error_colour(theme));
         }
     }
 }
@@ -372,7 +509,10 @@ impl Scene for Erosion {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pixels::IMAGERY_CEILING;
+    use crate::scenes::testing::{apart, check_pixel_scene, pixels};
     use crate::scenes::testing::{check_determinism, check_scene, render};
+    use crate::theme;
 
     #[test]
     fn passes_the_shared_checks() {
@@ -381,14 +521,20 @@ mod tests {
     }
 
     #[test]
+    fn paints_in_pixels_in_every_theme() {
+        check_pixel_scene("erosion", 40.0);
+    }
+
+    #[test]
     fn the_edge_creeps_back_then_holds_with_the_fence_hanging() {
         let mut rng = Rng::new(12);
         let mut cliff = Erosion::new(100, 30, Motion::FULL, &mut rng);
-        let start: Vec<i32> = (0..30).map(|y| cliff.edge(y)).collect();
+        let rows = cliff.tall();
+        let start: Vec<i32> = (0..rows).map(|y| cliff.edge(y)).collect();
         for _ in 0..(60 * 20) {
             cliff.step(0.05, &mut rng);
         }
-        let worn = (0..30)
+        let worn = (0..rows)
             .filter(|&y| cliff.edge(y) < start[y as usize])
             .count();
         assert!(worn >= 3, "{worn}");
@@ -401,12 +547,22 @@ mod tests {
             assert!(start[y as usize] - cliff.edge(y) <= most + 1);
             assert!(cliff.edge(y) > 0);
         }
+        let theme = theme::default_theme();
+        let c = Colours::new(theme);
         let frame = render(&mut cliff, 100, 30, 1);
-        let face: String = (cliff.top()..cliff.sea())
-            .map(|y| frame.get(cliff.edge(cliff.top()) + 1, y).unwrap().ch)
-            .collect();
-        assert!(face.contains('\\'), "the fence should hang: {face}");
+        // the fence hangs down the face below the clifftop
+        let below = (cliff.top() + 2) / 2..cliff.sea() / 2;
+        let hangs = below.clone().any(|row| {
+            (0..100).any(|x| {
+                frame
+                    .get(x, row)
+                    .and_then(|cell| cell.pixel_pair())
+                    .is_some_and(|(a, b)| a == c.hanging || b == c.hanging)
+            })
+        });
+        assert!(hangs, "the fence should hang");
         assert!(frame.to_text().contains("KEEP BACK"));
+        assert!(pixels(&frame).contains(&warning_colour(theme)));
     }
 
     #[test]
@@ -416,6 +572,7 @@ mod tests {
             let cliff = Erosion::new(80, 24, motion, &mut rng);
             assert!(cliff.period() >= CRUMBLE_PERIOD);
         }
+        const { assert!(SPLASH_LENGTH / 2.0 > 1.0 / 3.0) };
     }
 
     #[test]
@@ -429,5 +586,56 @@ mod tests {
         cliff.resize(80, 24, &mut rng);
         let kept: f32 = cliff.loss.iter().sum();
         assert!((worn - kept).abs() < 0.01);
+    }
+
+    #[test]
+    fn the_layers_stay_apart_in_every_theme() {
+        for theme in theme::all() {
+            let c = Colours::new(theme);
+            apart(
+                theme,
+                c.sea.at(0.0),
+                c.sea.at(1.0),
+                0.03,
+                "shallow and deep sea",
+            );
+            apart(theme, c.crest, c.sea.at(0.2), 0.03, "the surf and the sea");
+            apart(theme, c.strata[0], c.strata[1], 0.015, "the layers of rock");
+            apart(theme, c.face, c.strata[0], 0.03, "the face and the rock");
+            apart(
+                theme,
+                c.strata[0],
+                c.overcast.sky.at(1.0),
+                0.03,
+                "the rock and the sky",
+            );
+            apart(
+                theme,
+                c.hanging,
+                c.face,
+                0.1,
+                "the hanging fence and the face",
+            );
+            for colour in c
+                .sea
+                .steps()
+                .iter()
+                .chain(c.strata.iter())
+                .chain([&c.face, &c.crest])
+            {
+                assert!(
+                    theme.contrast_of(*colour) < IMAGERY_CEILING,
+                    "{}",
+                    theme.name
+                );
+            }
+            for colour in [c.post, c.hanging, c.stone] {
+                assert!(
+                    theme.contrast_of(colour) >= paint::SOLID - 0.01,
+                    "{}",
+                    theme.name
+                );
+            }
+        }
     }
 }

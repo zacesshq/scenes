@@ -10,7 +10,9 @@
 - **Something is hard to see, moves too much or flashes:** use the
   [accessibility problem form](https://github.com/zacesshq/scenes/issues/new?template=accessibility_problem.yml).
   An accessibility problem is a bug. You never need to share a diagnosis or anything personal. To
-  report privately, email [contact@zacess.com](mailto:contact@zacess.com).
+  report privately, email [support@zacess.com](mailto:support@zacess.com).
+- **Help with a scene, watch mode or follow mode:** email
+  [support@zacess.com](mailto:support@zacess.com).
 - **Security vulnerabilities:** never open a public issue. Follow [SECURITY.md](SECURITY.md).
 - **Anything else:** email [contact@zacess.com](mailto:contact@zacess.com).
 

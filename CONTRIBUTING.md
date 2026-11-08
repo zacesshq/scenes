@@ -88,10 +88,13 @@ Every colour lives in `palette/zacess.json`, a copy of the palette in
 `scripts/build-palette.py` and never edited by hand; CI fails when the two disagree. To take a new
 palette version, replace the JSON file, run the script and commit both.
 
-A scene draws at least 4.5 to 1 on the background (7 to 1 on the High Contrast and Deep
-Contrast themes, as `ThemeData::floor` says). The terminal colour roles already swap a colour below
-the
-floor for a stronger palette colour. The shared checks fail on any colour that slips under.
+Text keeps the theme's floor on the background, the palette's `textContrast` for that theme (7 to
+1 on the first eight themes and 4.5 to 1 on the Warm pair, as `ThemeData::floor` says). Background
+imagery is a tint held below the non-text floor of 3 to 1 (`IMAGERY_CEILING`) and pixel shapes
+that carry meaning keep at least that 3 to 1 against the background.
+The terminal colour roles already swap a colour below the floor for a stronger palette colour.
+A pixel scene's tests call `check_pixel_scene` in `src/scenes/testing.rs`, which holds it to these
+rules in every theme; the shared checks fail on any colour that slips under.
 
 ## Project conventions
 

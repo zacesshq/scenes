@@ -1,6 +1,6 @@
-# winget default locale manifest for Zacess Scenes 0.6.0.
+# winget default locale manifest for Zacess Scenes 1.0.0.
 PackageIdentifier: Zacess.Scenes
-PackageVersion: 0.6.0
+PackageVersion: 1.0.0
 PackageLocale: en-US
 Publisher: Zacess
 PublisherUrl: https://zacess.com
@@ -9,13 +9,13 @@ PackageName: Zacess Scenes
 PackageUrl: https://github.com/zacesshq/scenes
 License: MIT
 LicenseUrl: https://github.com/zacesshq/scenes/blob/main/LICENSE
-ShortDescription: Calm animated scenes for the terminal in the Zacess high contrast themes
-Description: Draws 39 calm animated scenes in the terminal in the eight Zacess high contrast themes, watches a project's build in any language and follows a shell, showing how each command ended as a scene. Every colour keeps 4.5 to 1 contrast on the background, nothing flashes and reduced motion is honoured from the Windows setting.
+ShortDescription: Calm animated scenes for the terminal in the ten Zacess accessible themes
+Description: Draws 65 calm animated scenes in solid pixels in the terminal in the ten Zacess accessible themes, watches a project's build in any language and follows a shell, showing how each command ended as a scene. Text keeps 7 to 1 contrast on eight themes and 4.5 to 1 on the two Warm themes, shapes that carry meaning keep at least 3 to 1, nothing flashes and reduced motion is honoured from the Windows setting.
 Moniker: zacess-scenes
 Tags:
   - accessibility
   - animation
   - terminal
-ReleaseNotesUrl: https://github.com/zacesshq/scenes/releases/tag/v0.6.0
+ReleaseNotesUrl: https://github.com/zacesshq/scenes/releases/tag/v1.0.0
 ManifestType: defaultLocale
 ManifestVersion: 1.6.0

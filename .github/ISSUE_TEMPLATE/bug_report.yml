@@ -18,6 +18,10 @@ body:
         - campfire
         - waves
         - zacess
+        - forest-stream
+        - desert-night
+        - rooftops
+        - lily-pads
         - koi-pond
         - harbour
         - lanterns
@@ -34,6 +38,17 @@ body:
         - garden
         - tiles
         - ribbons
+        - sunflower-field
+        - mountain-lake
+        - tide-pools
+        - paper-boats
+        - windmills
+        - picnic
+        - drone-landing
+        - kettle-boil
+        - rocket-launch
+        - pit-stop
+        - pcb-bring-up
         - storm
         - flood
         - listing-ship
@@ -47,6 +62,17 @@ body:
         - traffic-jam
         - erosion
         - drought
+        - volcano
+        - rockslide
+        - dust-storm
+        - thin-ice
+        - short-circuit
+        - overgrown
+        - landing-abort
+        - kettle-cold
+        - launch-scrub
+        - pit-stop-stuck
+        - dead-led
         - A Lua scene of my own
         - The watch mode
         - Every scene
@@ -67,6 +93,8 @@ body:
         - Zacess High Contrast Light
         - Zacess Deep Contrast Dark
         - Zacess Deep Contrast Light
+        - Zacess Warm Dark
+        - Zacess Warm Light
         - NO_COLOR
   - type: dropdown
     id: terminal
@@ -115,7 +143,7 @@ body:
     attributes:
       label: Version and system
       description: The output of `zacess-scenes --version`, the operating system and the terminal version.
-      placeholder: zacess-scenes 0.1.0, macOS 26, Ghostty 1.2
+      placeholder: zacess-scenes 1.0.0, macOS 26, Ghostty 1.2
   - type: dropdown
     id: ai-use
     attributes:

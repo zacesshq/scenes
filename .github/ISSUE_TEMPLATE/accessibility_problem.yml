@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thank you for telling us. We treat an accessibility problem as a bug. You never need to share a diagnosis or anything personal: describe what happened and we will work from that. If you would rather report privately, email contact@zacess.com.
+        Thank you for telling us. We treat an accessibility problem as a bug. You never need to share a diagnosis or anything personal: describe what happened and we will work from that. If you would rather report privately, email support@zacess.com.
   - type: dropdown
     id: scene
     attributes:
@@ -22,6 +22,10 @@ body:
         - campfire
         - waves
         - zacess
+        - forest-stream
+        - desert-night
+        - rooftops
+        - lily-pads
         - koi-pond
         - harbour
         - lanterns
@@ -38,6 +42,17 @@ body:
         - garden
         - tiles
         - ribbons
+        - sunflower-field
+        - mountain-lake
+        - tide-pools
+        - paper-boats
+        - windmills
+        - picnic
+        - drone-landing
+        - kettle-boil
+        - rocket-launch
+        - pit-stop
+        - pcb-bring-up
         - storm
         - flood
         - listing-ship
@@ -51,6 +66,17 @@ body:
         - traffic-jam
         - erosion
         - drought
+        - volcano
+        - rockslide
+        - dust-storm
+        - thin-ice
+        - short-circuit
+        - overgrown
+        - landing-abort
+        - kettle-cold
+        - launch-scrub
+        - pit-stop-stuck
+        - dead-led
         - A Lua scene of my own
         - The watch mode
         - Every scene
@@ -71,6 +97,8 @@ body:
         - Zacess High Contrast Light
         - Zacess Deep Contrast Dark
         - Zacess Deep Contrast Light
+        - Zacess Warm Dark
+        - Zacess Warm Light
         - NO_COLOR
   - type: textarea
     id: barrier
@@ -95,7 +123,7 @@ body:
     id: version
     attributes:
       label: Version and terminal (optional)
-      placeholder: zacess-scenes 0.1.0, Windows Terminal 1.23
+      placeholder: zacess-scenes 1.0.0, Windows Terminal 1.23
   - type: dropdown
     id: ai-use
     attributes:

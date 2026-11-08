@@ -387,6 +387,9 @@ fn run_snapshot(options: cli::SnapshotOptions) -> Result<(), String> {
         seed: options.seed,
         motion: Motion::new(resolved.reduced_motion, resolved.motion),
         state: options.state,
+        clock: options
+            .clock
+            .unwrap_or(zacess_scenes::clock::SNAPSHOT_START),
     };
     let text = match options.frames {
         Some(count) => {

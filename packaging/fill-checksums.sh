@@ -5,7 +5,7 @@ set -euo pipefail
 # the .sha256 files attached to a release, writing the finished files to an output folder so the
 # templates in this repository keep their placeholders.
 #
-#   packaging/fill-checksums.sh v0.6.0 /path/to/output
+#   packaging/fill-checksums.sh v1.0.0 /path/to/output
 #
 # needs the GitHub CLI, logged in to an account that can read zacesshq/scenes.
 

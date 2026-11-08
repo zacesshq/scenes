@@ -14,7 +14,7 @@ body:
     id: picture
     attributes:
       label: What it shows
-      description: What is on screen and what moves. Characters you have in mind are welcome.
+      description: What is on screen and what moves, by night and on a light theme if they differ. Shapes or colours you have in mind are welcome.
     validations:
       required: true
   - type: textarea
@@ -33,7 +33,7 @@ body:
     id: colours
     attributes:
       label: Colours
-      description: Which of the theme's colours each part would use, if you have a view. Every colour has to keep 4.5 to 1 contrast on the background in all eight themes.
+      description: "Which of the theme's colours each part would use, if you have a view. Background imagery stays below 3 to 1, shapes that carry meaning keep at least 3 to 1 and text keeps the theme's floor in all ten themes: 7 to 1 on most and 4.5 to 1 on the two Warm themes."
   - type: dropdown
     id: ai-use
     attributes:
