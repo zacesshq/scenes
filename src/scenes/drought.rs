@@ -317,7 +317,9 @@ impl Drought {
                 let (mut best, mut next) = ((f32::MAX, 0u32), (f32::MAX, 0u32));
                 for dj in -1..=1 {
                     for di in -1..=1 {
-                        let (i, j) = (ci + di, cj + dj);
+                        // the horizon row has an infinite depth, so its plate index saturates and the
+                        // neighbour step wraps instead of overflowing
+                        let (i, j) = (ci.wrapping_add(di), cj.wrapping_add(dj));
                         let (sx, sz) = seed_at(i, j);
                         let d = (gx - sx).powi(2) + (z - sz).powi(2);
                         let id = (i.wrapping_mul(7919) ^ j.wrapping_mul(104_729)) as u32;

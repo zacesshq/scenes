@@ -33,3 +33,14 @@ signal-hook = "0.4"
 lto = true
 codegen-units = 1
 strip = true
+
+# the test build CI runs: release speed, so the pixel scene tests finish in minutes, with the overflow
+# and debug assertion checks a debug build has, so an arithmetic slip still fails a test. Only tests use
+# it; the installed binary keeps the release profile above
+[profile.ci]
+inherits = "release"
+lto = false
+codegen-units = 16
+strip = false
+overflow-checks = true
+debug-assertions = true

@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Changed
 
+- CI runs the tests with a `ci` profile: release speed with overflow and debug assertion checks on, so the suite finishes in a few minutes on every platform and still catches arithmetic slips.
 - The embedded palette moves to Zacess Themes 1.0.0, which gives Zacess Warm Light its final code, selection, current line and find match colours.
 - The original ten scenes and the 29 earlier pass and fail scenes are repainted in pixels and many have new compositions. Among them `sea` has fish with fins and forked tails, `rain` is a lamplit wet street with a walker under an umbrella, `fireflies` is a meadow at dusk under a great tree, `zacess` floats the mark large in the middle of the screen, `storm` has rolling cloud over open country and a tree in full leaf, `koi-pond` has koi seen from above with fins and classic patterns, `mountain-lake` is a lake at first light, `leak` is a lit basement, `corrosion` is rusting riveted steel, `traffic-jam` is a side-on queue at a red signal and `fog` is a road at dusk where a wall of fog rolls in.
 - A terminal colour below a theme's floor keeps its hue: it is replaced by its bright or plain twin when that keeps the floor and otherwise only its lightness moves until it reaches the floor. Before, it borrowed the nearest palette colour, which on Cream turned the yellow into the muted ink and left two roles the same colour.
@@ -44,6 +45,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+- The drought scene's horizon row no longer overflows a plate index in a build with overflow checks; it wraps as the release build always has, so the picture is unchanged.
 - SVG stills and JSON frames no longer show faint seams between rows. A still draws a solid shape as one rectangle over the half rows it covers and a JSON frame gives each pixel cell its top pixel as the background and its bottom pixel as a lower half block, which overlaps the line to the next row.
 - The JSON frames from `snapshot --frames` carry each cell's background, so a page playing them shows both pixels of every cell.
 - The watch mode's opening from a fail scene to a pass scene copies whole cells, so the scene behind keeps its backgrounds.
