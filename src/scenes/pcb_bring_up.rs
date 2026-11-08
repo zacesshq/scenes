@@ -930,9 +930,8 @@ impl Bench {
 
     fn paint_leads(&self, canvas: &mut Canvas, c: &Colours) {
         let b = self.board();
-        if let Some(s) = self.supply()
-            && b.h >= 8
-        {
+        // a match on both rather than a let chain, which needs a newer Rust than the crate's minimum
+        if let (Some(s), true) = (self.supply(), b.h >= 8) {
             let (rx, bx) = self.posts(s);
             let y = s.bottom() - 4;
             let header = (b.right() - 3, b.y + 2);
